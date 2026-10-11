@@ -12,7 +12,7 @@ Built for design-system and platform teams with a React design-system package; a
 
 <!-- npm-readme:video -->
 
-https://github.com/user-attachments/assets/8ca1c640-94c2-4003-b59e-2b0d819c492d
+https://github.com/user-attachments/assets/ebfa176b-a66a-4ab7-bc3b-a4787540647f
 
 <sub>On the <a href="https://onsystem.vercel.app">website</a>, an agent drafts a settings card, <code>check_ui</code> finds 11 problems with a fix each, and the agent applies them. Then a real Claude Code session with the plugin: Claude looks the components up before writing, and <code>check_ui</code> passes. Last, the benchmark.</sub>
 
