@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { Benchmark as EarlierBenchmark } from '@/components/benchmark';
 import { Headline, HeadlineStats } from '@/components/benchmark-summary';
 import { MarkdownBlocks } from '@/components/markdown-blocks';
+import { ScrollRegion } from '@/components/scroll-region';
 import { Eyebrow, InlineCode, TextLink } from '@/components/section';
 import {
   ARM_LABELS,
@@ -88,9 +89,13 @@ function ArmName({ arm }: { arm: string }) {
   );
 }
 
-/** A table that scrolls sideways on narrow screens. */
-function Scroll({ children }: { children: ReactNode }) {
-  return <div className="overflow-x-auto rounded-xl border border-line">{children}</div>;
+/** A table that scrolls sideways on narrow screens, named by its caption. */
+function Scroll({ table, children }: { table: string; children: ReactNode }) {
+  return (
+    <ScrollRegion labelledBy={`${table}-caption`} className="rounded-xl border border-line">
+      {children}
+    </ScrollRegion>
+  );
 }
 
 function Fold({ summary, children }: { summary: string; children: ReactNode }) {
@@ -111,9 +116,9 @@ function Fold({ summary, children }: { summary: string; children: ReactNode }) {
 /** Every arm, pooled over all models. */
 function ArmsTable() {
   return (
-    <Scroll>
+    <Scroll table="arms">
       <table data-table="arms" className="w-full min-w-[720px] text-left text-[13px]">
-        <caption className="sr-only">
+        <caption id="arms-caption" className="sr-only">
           Results by arm, pooled over all {benchmark.models.length} models, with 95% intervals
         </caption>
         <thead className="bg-raised">
@@ -219,9 +224,9 @@ function DeltaHead({ first }: { first: ReactNode }) {
 /** Each arm against `none`, pooled over all models. */
 function DeltasTable() {
   return (
-    <Scroll>
+    <Scroll table="deltas">
       <table data-table="deltas" className="w-full min-w-[680px] text-left text-[13px]">
-        <caption className="sr-only">
+        <caption id="deltas-caption" className="sr-only">
           Each arm against no onsystem, paired on model, task and repeat, all models, with 95%
           intervals
         </caption>
@@ -265,9 +270,9 @@ function ModelCell({ model }: { model: string }) {
 /** Every row of results.json: each model, each tier's models, all models. */
 function ModelsTable() {
   return (
-    <Scroll>
+    <Scroll table="models">
       <table data-table="models" className="w-full min-w-[1080px] text-left text-[13px]">
-        <caption className="sr-only">
+        <caption id="models-caption" className="sr-only">
           Results for every model and arm, then each tier and all models pooled, with 95% intervals
         </caption>
         <thead className="bg-raised">
@@ -324,9 +329,9 @@ function ModelsTable() {
 /** Every paired difference in results.json. */
 function ModelDeltasTable() {
   return (
-    <Scroll>
+    <Scroll table="model-deltas">
       <table data-table="model-deltas" className="w-full min-w-[820px] text-left text-[13px]">
-        <caption className="sr-only">
+        <caption id="model-deltas-caption" className="sr-only">
           Each arm against no onsystem for every model, each tier and all models, with 95% intervals
         </caption>
         <DeltaHead
@@ -371,9 +376,9 @@ function LabelsTable() {
     </>
   );
   return (
-    <Scroll>
+    <Scroll table="labels">
       <table data-table="labels" className="w-full min-w-[640px] text-left text-[13px]">
-        <caption className="sr-only">
+        <caption id="labels-caption" className="sr-only">
           The blind-labelled sample by arm, as the labeller counted it, with 95% intervals
         </caption>
         <thead className="bg-raised">
@@ -621,8 +626,11 @@ export default function BenchmarkPage() {
             </Sub>
 
             <Sub title="The repositories">
-              <Scroll>
+              <Scroll table="repositories">
                 <table className="w-full min-w-[720px] text-left text-[13px]">
+                  <caption id="repositories-caption" className="sr-only">
+                    The repositories
+                  </caption>
                   <thead className="bg-raised">
                     <tr>
                       {['Repository', 'Commit', 'App', 'Design system', 'TypeScript'].map((l) => (
@@ -681,8 +689,11 @@ export default function BenchmarkPage() {
                 </p>
               </Prose>
               <div className="mt-4">
-                <Scroll>
+                <Scroll table="model-list">
                   <table className="w-full min-w-[560px] text-left text-[13px]">
+                    <caption id="model-list-caption" className="sr-only">
+                      The models
+                    </caption>
                     <thead className="bg-raised">
                       <tr>
                         {['Model', 'ID', 'Provider', 'Tier', 'Runs'].map((l) => (

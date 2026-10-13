@@ -1,4 +1,5 @@
 import { CheckIcon } from '@/components/icons';
+import { ScrollRegion } from '@/components/scroll-region';
 import type { Bench, BenchModel } from '@/lib/data';
 
 const WITHOUT = '#5d6875';
@@ -174,9 +175,9 @@ export function Benchmark({ bench }: { bench: Bench }) {
           <span className="font-mono text-xs text-subtle group-open:hidden">Show</span>
           <span className="hidden font-mono text-xs text-subtle group-open:inline">Hide</span>
         </summary>
-        <div className="overflow-x-auto border-t border-line">
+        <ScrollRegion labelledBy="every-run-caption" className="border-t border-line">
           <table className="w-full min-w-[640px] text-left text-[13px]">
-            <caption className="sr-only">
+            <caption id="every-run-caption" className="sr-only">
               Design-system errors per task, for each model, without and with the plugin
             </caption>
             <thead>
@@ -219,7 +220,7 @@ export function Benchmark({ bench }: { bench: Bench }) {
               ))}
             </tbody>
           </table>
-        </div>
+        </ScrollRegion>
       </details>
     </div>
   );
