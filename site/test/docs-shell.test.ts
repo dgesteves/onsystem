@@ -10,7 +10,7 @@ import RequiredCheckPage from '@/app/docs/required-check/page';
 import RulesPage from '@/app/rules/page';
 import { Code, wrapsLines } from '@/components/code';
 import { InlineMarkdown } from '@/components/markdown';
-import { MarkdownBlocks, parseBlocks, type Block } from '@/components/markdown-blocks';
+import { MarkdownBlocks, parseBlocks, slug, type Block } from '@/components/markdown-blocks';
 import { assistantLinks } from '@/components/page-actions';
 import { ruleCatalog } from '@/lib/data';
 import { DOCS_GROUPS, DOCS_NAV, DOCS_PAGES, docsPage } from '@/lib/docs';
@@ -133,9 +133,15 @@ describe('a docs page', () => {
     expect(page).toMatch(/<h2 id="the-skill" data-toc="What the skill tells Claude"/);
   });
 
-  it('gives each FAQ question an anchor', () => {
+  it('gives each FAQ question an anchor, and names its section by the question alone', () => {
     const page = render(createElement(FaqPage));
-    for (const [question] of FAQ) expect(text(page)).toContain(`Link to the section ${question}`);
+    for (const [question] of FAQ) {
+      const id = slug(question);
+      expect(text(page)).toContain(`Link to the section ${question}`);
+      expect(page).toContain(`<section aria-labelledby="${id}-text">`);
+      const label = new RegExp(`<span id="${id}-text">([^<]*)</span>`).exec(page)?.[1];
+      expect(text(label ?? '')).toBe(question);
+    }
   });
 
   it('opens ChatGPT and Claude with a prompt that points at the page’s Markdown', () => {
@@ -338,6 +344,14 @@ describe('headings', () => {
     expect(html).toContain('<span class="sr-only">Link to the section Config file</span>');
     expect(html).toMatch(/<h3 id="exclude" data-toc="exclude"/);
     expect(html).toMatch(/<h4 id="deep" data-level="4"/);
+  });
+
+  it('are named by their visible text alone, while the link keeps its own name', () => {
+    const html = markdown('## Config file');
+    expect(html).toMatch(
+      /<h2 id="config-file"[^>]* aria-labelledby="config-file-text"><span id="config-file-text">Config file<\/span><a href="#config-file"/,
+    );
+    expect(html).toContain('<span class="sr-only">Link to the section Config file</span>');
   });
 
   it('turn a details summary into an h3', () => {

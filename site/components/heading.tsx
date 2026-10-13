@@ -6,9 +6,15 @@ const STYLES = {
   4: 'mt-7 text-[15.5px]',
 } as const;
 
+/** The id of a heading's visible text, for a section labelled by the heading. */
+export function headingTextId(id: string): string {
+  return `${id}-text`;
+}
+
 /**
  * A section heading with a link to itself: a `#` that shows on hover or focus, so a section's
- * URL can be copied. `toc` puts it in "On this page" (h2 and h3 by default).
+ * URL can be copied. `toc` puts it in "On this page" (h2 and h3 by default). The heading is named
+ * by its visible text alone, not by the link's.
  */
 export function AnchorHeading({
   level,
@@ -36,8 +42,9 @@ export function AnchorHeading({
       data-toc={toc ? label : undefined}
       data-level={level}
       className={`group scroll-mt-28 font-semibold tracking-tight text-fg first:mt-0 lg:scroll-mt-20 ${STYLES[look]} ${className}`}
+      aria-labelledby={headingTextId(id)}
     >
-      {children}
+      <span id={headingTextId(id)}>{children}</span>
       <a
         href={`#${id}`}
         className="ml-2 inline-block text-subtle no-underline opacity-0 transition-opacity group-hover:opacity-100 hover:text-cyan focus-visible:opacity-100"

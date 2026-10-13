@@ -1,5 +1,5 @@
 import { Code } from '@/components/code';
-import { AnchorHeading } from '@/components/heading';
+import { AnchorHeading, headingTextId } from '@/components/heading';
 import { ArrowUpRightIcon } from '@/components/icons';
 import { InlineCode } from '@/components/section';
 import { DOCS_MCP } from '@/lib/docs-mcp';
@@ -15,7 +15,7 @@ const link = 'text-fg underline decoration-line-strong underline-offset-4 hover:
 export function DocsForAgents() {
   return (
     <section
-      aria-labelledby={ID}
+      aria-labelledby={headingTextId(ID)}
       className="mt-14 rounded-2xl border border-line bg-raised p-5 sm:p-6"
     >
       <AnchorHeading level={2} id={ID} label={TITLE}>

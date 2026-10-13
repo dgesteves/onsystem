@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 import { DocPage, docsMetadata } from '@/components/doc-page';
-import { AnchorHeading } from '@/components/heading';
+import { AnchorHeading, headingTextId } from '@/components/heading';
 import { InlineMarkdown } from '@/components/markdown';
 import { slug } from '@/components/markdown-blocks';
 import { FAQ } from '@/lib/faq';
@@ -13,7 +13,7 @@ export default function FaqPage() {
     <DocPage href="/docs/faq">
       <div className="grid gap-8">
         {FAQ.map(([question, answer]) => (
-          <section key={question} aria-labelledby={slug(question)}>
+          <section key={question} aria-labelledby={headingTextId(slug(question))}>
             <AnchorHeading level={2} look={3} id={slug(question)} label={question}>
               {question}
             </AnchorHeading>

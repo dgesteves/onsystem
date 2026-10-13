@@ -231,6 +231,10 @@ describe('the docs for agents', () => {
     expect(html).toMatch(
       /<h2 id="use-these-docs-from-your-agent" data-toc="Use these docs from your agent" data-level="2" class="[^"]*scroll-mt-28[^"]*lg:scroll-mt-20/,
     );
+    expect(html).toContain('<section aria-labelledby="use-these-docs-from-your-agent-text"');
+    expect(html).toContain(
+      '<span id="use-these-docs-from-your-agent-text">Use these docs from your agent</span>',
+    );
     const footer = renderToStaticMarkup(createElement(SiteFooter));
     expect(footer).toContain('href="/docs#use-these-docs-from-your-agent"');
   });
