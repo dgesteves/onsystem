@@ -383,4 +383,11 @@ describe('inline code', () => {
     const html = inline('`https://unpkg.com/onsystem/schema.json`');
     expect(html).toContain('max-sm:[overflow-wrap:anywhere] sm:whitespace-nowrap');
   });
+
+  it('keeps a wrapped pill inside the text column', () => {
+    // Padding cloned onto each line of a wrapped pill reaches past the column edge, by up to 4 px
+    // into the page's side padding on a phone.
+    const html = inline('`not a workspace package: an installed package is compiled`');
+    expect(html).not.toContain('box-decoration-clone');
+  });
 });
