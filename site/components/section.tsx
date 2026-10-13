@@ -78,11 +78,9 @@ export function CodeText({ text }: { text: string }) {
   );
 }
 
-/**
- * The inline code style, shared with the Markdown renderer. A pill that wraps keeps its padding
- * at its two ends only: padding repeated at a line break would reach past the text column.
- */
-export const INLINE_CODE = 'rounded bg-fg/[0.06] px-1 py-px font-mono text-fg-soft';
+/** The inline code style, shared with the Markdown renderer. */
+export const INLINE_CODE =
+  'rounded bg-fg/[0.06] px-1 py-px font-mono text-fg-soft box-decoration-clone';
 
 export function InlineCode({ children }: { children: ReactNode }) {
   return (

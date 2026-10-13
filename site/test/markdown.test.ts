@@ -3,8 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
 import { InlineMarkdown } from '@/components/markdown';
-import { MarkdownBlocks, parseBlocks, tableLabel } from '@/components/markdown-blocks';
-import { markOverflow } from '@/components/scroll-region';
+import { MarkdownBlocks, parseBlocks } from '@/components/markdown-blocks';
 
 const inline = (text: string) => renderToStaticMarkup(createElement(InlineMarkdown, { text }));
 const text = (html: string) => html.replace(/<[^>]+>/g, '');
@@ -69,25 +68,6 @@ describe('MarkdownBlocks', () => {
     expect(html.match(/<ol/g)).toHaveLength(1);
     expect(html.match(/<li/g)).toHaveLength(4);
     expect(html).toContain('<pre');
-  });
-
-  it('names a table by its columns, for the region it scrolls in when it is too wide', () => {
-    expect(tableLabel(['What', 'Before', '`Now`'])).toBe('Table: What, Before, Now');
-    expect(tableLabel(['', 'Arm'])).toBe('Table: Arm');
-    const attributes = new Map<string, string>();
-    const element = {
-      scrollWidth: 1000,
-      clientWidth: 700,
-      tabIndex: -1,
-      setAttribute: (name: string, value: string) => attributes.set(name, value),
-      removeAttribute: (name: string) => attributes.delete(name),
-    };
-    markOverflow(element as unknown as HTMLElement, { label: 'Table: What, Before, Now' });
-    expect(element.tabIndex).toBe(0);
-    expect(Object.fromEntries(attributes)).toEqual({
-      role: 'region',
-      'aria-label': 'Table: What, Before, Now',
-    });
   });
 
   it('still ends a list at a blank line before something else', () => {

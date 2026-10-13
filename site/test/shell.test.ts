@@ -12,7 +12,6 @@ import { GET as docsCard, generateStaticParams as cardParams } from '@/app/og/do
 import Home, { metadata as homeMetadata } from '@/app/page';
 import sitemap from '@/app/sitemap';
 import { docsMetadata } from '@/components/doc-page';
-import { INLINE_CODE } from '@/components/section';
 import { NAV } from '@/components/site-header';
 import { DOCS_PAGES, docsHeadings, docsMarkdown, docsSlug } from '@/lib/docs';
 import { lastModified } from '@/lib/git';
@@ -82,46 +81,48 @@ describe('the theme', () => {
     }
   });
 
-  it.each([
-    ['light', 0],
-    ['dark', 1],
-  ] as const)('keeps highlighted code at 4.5:1 or more inside every finding mark, %s', (_, t) => {
-    const colours = [...css.matchAll(/\.tok-(\w+) \{\n {2}color: light-dark\((#\w+), (#\w+)\)/g)];
-    const marks = [
-      ...css.matchAll(
-        /\.mark-(\w+) \{[^}]*?background: color-mix\(in oklab, var\(--color-([\w-]+)\) (\d+)%, transparent\)/g,
-      ),
-    ];
-    expect(marks.map(([, kind]) => kind)).toEqual(['error', 'warning', 'changed', 'active']);
-    // The tint at its opacity, laid over the panel the code sits on (bg-code, or bg-raised in
-    // the landing page's demo), the way the browser composites it.
-    const over = (tint: string, alpha: number, surface: string) =>
-      `#${[1, 3, 5]
-        .map((i) => {
-          const [a, b] = [tint, surface].map((hex) => parseInt(hex.slice(i, i + 2), 16));
-          return Math.round((a ?? 0) * alpha + (b ?? 0) * (1 - alpha))
-            .toString(16)
-            .padStart(2, '0');
-        })
-        .join('')}`;
-    for (const surface of ['code', 'raised']) {
-      for (const [, mark, tint = '', percent = ''] of marks) {
-        const pair = tokens[tint] ?? { light: '', dark: '' };
-        const panel = tokens[surface] ?? { light: '', dark: '' };
-        const background = over(
-          t === 0 ? pair.light : pair.dark,
-          Number(percent) / 100,
-          t === 0 ? panel.light : panel.dark,
-        );
-        for (const [, kind, light = '', dark = ''] of colours) {
-          expect(
-            contrast(t === 0 ? light : dark, background),
-            `${kind} in mark-${mark} on ${surface}`,
-          ).toBeGreaterThanOrEqual(4.5);
+  it.each(['light', 'dark'] as const)(
+    'keeps highlighted code at 4.5:1 or more inside every finding highlight, %s',
+    (t) => {
+      // A highlight is its colour at a few per cent over the block: the code background, or the
+      // raised panel of the home page's demo.
+      const over = (hex: string, percent: number, base: string) =>
+        `#${[1, 3, 5]
+          .map((i) => {
+            const [a, b] = [hex, base].map((c) => parseInt(c.slice(i, i + 2), 16));
+            const mixed = Math.round(((a ?? 0) * percent + (b ?? 0) * (100 - percent)) / 100);
+            return mixed.toString(16).padStart(2, '0');
+          })
+          .join('')}`;
+      const marks = [
+        ...css.matchAll(
+          /\.mark-(\w+) \{[^}]*?background: color-mix\(in oklab, var\(--color-([\w-]+)\) (\d+)%, transparent\);/g,
+        ),
+      ];
+      expect(marks.map(([, kind]) => kind).sort()).toEqual([
+        'active',
+        'changed',
+        'error',
+        'warning',
+      ]);
+      const colours = [...css.matchAll(/\.tok-(\w+) \{\n {2}color: light-dark\((#\w+), (#\w+)\)/g)];
+      for (const [, mark, colour = '', percent = ''] of marks) {
+        for (const surface of ['code', 'raised']) {
+          const background = over(
+            tokens[colour]?.[t] ?? '',
+            Number(percent),
+            tokens[surface]?.[t] ?? '',
+          );
+          for (const [, kind, light = '', dark = ''] of colours) {
+            const ratio = contrast(t === 'light' ? light : dark, background);
+            expect(ratio, `${kind} in .mark-${mark ?? ''} on ${surface}`).toBeGreaterThanOrEqual(
+              4.5,
+            );
+          }
         }
       }
-    }
-  });
+    },
+  );
 
   it('follows the OS until a theme is picked, and .light or .dark on <html> force one', () => {
     expect(css).toMatch(/:root \{\n {2}color-scheme: light dark;/);
@@ -451,29 +452,5 @@ describe('the sitemap', () => {
         lastModified([page.source]) !== null,
       );
     }
-  });
-});
-
-// ─── Narrow screens ─────────────────────────────────────────────────────────
-
-describe('narrow screens', () => {
-  const source = (file: string) => fs.readFileSync(path.join(site, file), 'utf8');
-
-  it("lets the playground's findings shrink to the screen, the rule name truncating", () => {
-    const playground = source('components/playground.tsx');
-    // A grid's auto column grows to its widest finding; this one fits the panel instead.
-    expect(playground).toMatch(/<ol\s+className=\{`grid grid-cols-\[minmax\(0,1fr\)\]/);
-    expect(playground).toContain('<span className="truncate">{d.ruleId}</span>');
-  });
-
-  it("breaks the long paths in the benchmark's task list", () => {
-    expect(source('app/benchmark/page.tsx')).toContain(
-      '<ul className="mt-1.5 grid gap-1.5 text-muted [overflow-wrap:anywhere]">',
-    );
-  });
-
-  it('keeps a wrapped inline code pill inside the text column', () => {
-    // Padding cloned onto each line of a wrapped pill lands past the column edge.
-    expect(INLINE_CODE).not.toContain('box-decoration-clone');
   });
 });

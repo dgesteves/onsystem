@@ -6,15 +6,11 @@ const STYLES = {
   4: 'mt-7 text-[15.5px]',
 } as const;
 
-/** The id of a heading's visible text, for a section labelled by the heading. */
-export function headingTextId(id: string): string {
-  return `${id}-text`;
-}
-
 /**
  * A section heading with a link to itself: a `#` that shows on hover or focus, so a section's
- * URL can be copied. `toc` puts it in "On this page" (h2 and h3 by default). The heading is named
- * by its visible text alone, not by the link's.
+ * URL can be copied. `toc` puts it in "On this page" (h2 and h3 by default). The link follows
+ * the heading rather than sitting in it, so the heading's name is its text alone; the heading
+ * is inline, so the `#` still ends its last line.
  */
 export function AnchorHeading({
   level,
@@ -37,14 +33,17 @@ export function AnchorHeading({
 }) {
   const Tag = `h${String(level)}` as 'h2' | 'h3' | 'h4';
   return (
-    <Tag
-      id={id}
-      data-toc={toc ? label : undefined}
-      data-level={level}
-      className={`group scroll-mt-28 font-semibold tracking-tight text-fg first:mt-0 lg:scroll-mt-20 ${STYLES[look]} ${className}`}
-      aria-labelledby={headingTextId(id)}
+    <div
+      className={`group font-semibold tracking-tight text-fg first:mt-0 ${STYLES[look]} ${className}`}
     >
-      <span id={headingTextId(id)}>{children}</span>
+      <Tag
+        id={id}
+        data-toc={toc ? label : undefined}
+        data-level={level}
+        className="inline scroll-mt-28 lg:scroll-mt-20"
+      >
+        {children}
+      </Tag>
       <a
         href={`#${id}`}
         className="ml-2 inline-block text-subtle no-underline opacity-0 transition-opacity group-hover:opacity-100 hover:text-cyan focus-visible:opacity-100"
@@ -52,7 +51,7 @@ export function AnchorHeading({
         <span aria-hidden="true">#</span>
         <span className="sr-only">Link to the section {label}</span>
       </a>
-    </Tag>
+    </div>
   );
 }
 

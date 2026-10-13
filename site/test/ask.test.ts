@@ -42,17 +42,20 @@ describe('the docs index', () => {
     );
   });
 
-  it('cites each FAQ answer by the anchor its question has on the page', () => {
-    const faq = index.documents.findIndex((doc) => doc.url === '/docs/faq');
-    const anchors = index.chunks.filter((c) => c.doc === faq).map((c) => c.anchor);
-    expect(anchors).toEqual(FAQ.map(([question]) => slug(question)));
+  it('leaves out the docs renderer’s markers, as the pages’ Markdown does', () => {
+    for (const chunk of index.chunks) {
+      expect(chunk.text, chunk.id).not.toMatch(/^```\w+ pm$/m);
+      expect(chunk.text, chunk.id).not.toContain('<!-- steps -->');
+    }
+    const ci = index.chunks.find((c) => c.text.includes('npm install --save-dev onsystem'));
+    expect(ci?.text).toContain('```sh\nnpm install --save-dev onsystem');
   });
 
-  it("leaves out the renderer's own markers, as the .md pages do", () => {
-    const text = index.chunks.map((chunk) => chunk.text).join('\n');
-    expect(text).toContain('npm install --save-dev onsystem');
-    expect(text).not.toMatch(/^```\w+ pm$/m);
-    expect(text).not.toContain('<!-- steps -->');
+  it('cites each FAQ question by the anchor the FAQ page gives it', () => {
+    const faq = index.documents.findIndex((doc) => doc.url === '/docs/faq');
+    expect(index.documents[faq]?.title).toBe('FAQ');
+    const anchors = index.chunks.filter((c) => c.doc === faq).map((c) => c.anchor);
+    expect(anchors).toEqual(FAQ.map(([question]) => slug(question)));
   });
 
   it('is keyword-only, so building and searching it calls no model', () => {
@@ -230,10 +233,6 @@ describe('the docs for agents', () => {
     const html = renderToStaticMarkup(createElement(DocsForAgents));
     expect(html).toMatch(
       /<h2 id="use-these-docs-from-your-agent" data-toc="Use these docs from your agent" data-level="2" class="[^"]*scroll-mt-28[^"]*lg:scroll-mt-20/,
-    );
-    expect(html).toContain('<section aria-labelledby="use-these-docs-from-your-agent-text"');
-    expect(html).toContain(
-      '<span id="use-these-docs-from-your-agent-text">Use these docs from your agent</span>',
     );
     const footer = renderToStaticMarkup(createElement(SiteFooter));
     expect(footer).toContain('href="/docs#use-these-docs-from-your-agent"');

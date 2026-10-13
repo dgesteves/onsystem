@@ -4,8 +4,8 @@ import type { ReactNode } from 'react';
 import { Benchmark as EarlierBenchmark } from '@/components/benchmark';
 import { Headline, HeadlineStats } from '@/components/benchmark-summary';
 import { MarkdownBlocks } from '@/components/markdown-blocks';
-import { ScrollRegion } from '@/components/scroll-region';
 import { Eyebrow, InlineCode, TextLink } from '@/components/section';
+import { TableScroll } from '@/components/table-scroll';
 import {
   ARM_LABELS,
   count,
@@ -89,12 +89,12 @@ function ArmName({ arm }: { arm: string }) {
   );
 }
 
-/** A table that scrolls sideways on narrow screens, named by its caption. */
-function Scroll({ table, children }: { table: string; children: ReactNode }) {
+/** A table that scrolls sideways on narrow screens, and takes focus while it does. */
+function Scroll({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <ScrollRegion labelledBy={`${table}-caption`} className="rounded-xl border border-line">
+    <TableScroll label={label} className="rounded-xl border border-line">
       {children}
-    </ScrollRegion>
+    </TableScroll>
   );
 }
 
@@ -116,9 +116,9 @@ function Fold({ summary, children }: { summary: string; children: ReactNode }) {
 /** Every arm, pooled over all models. */
 function ArmsTable() {
   return (
-    <Scroll table="arms">
+    <Scroll label="Results by arm">
       <table data-table="arms" className="w-full min-w-[720px] text-left text-[13px]">
-        <caption id="arms-caption" className="sr-only">
+        <caption className="sr-only">
           Results by arm, pooled over all {benchmark.models.length} models, with 95% intervals
         </caption>
         <thead className="bg-raised">
@@ -224,9 +224,9 @@ function DeltaHead({ first }: { first: ReactNode }) {
 /** Each arm against `none`, pooled over all models. */
 function DeltasTable() {
   return (
-    <Scroll table="deltas">
+    <Scroll label="Each arm against no onsystem">
       <table data-table="deltas" className="w-full min-w-[680px] text-left text-[13px]">
-        <caption id="deltas-caption" className="sr-only">
+        <caption className="sr-only">
           Each arm against no onsystem, paired on model, task and repeat, all models, with 95%
           intervals
         </caption>
@@ -270,9 +270,9 @@ function ModelCell({ model }: { model: string }) {
 /** Every row of results.json: each model, each tier's models, all models. */
 function ModelsTable() {
   return (
-    <Scroll table="models">
+    <Scroll label="Results by model">
       <table data-table="models" className="w-full min-w-[1080px] text-left text-[13px]">
-        <caption id="models-caption" className="sr-only">
+        <caption className="sr-only">
           Results for every model and arm, then each tier and all models pooled, with 95% intervals
         </caption>
         <thead className="bg-raised">
@@ -329,9 +329,9 @@ function ModelsTable() {
 /** Every paired difference in results.json. */
 function ModelDeltasTable() {
   return (
-    <Scroll table="model-deltas">
+    <Scroll label="Each arm against no onsystem, by model">
       <table data-table="model-deltas" className="w-full min-w-[820px] text-left text-[13px]">
-        <caption id="model-deltas-caption" className="sr-only">
+        <caption className="sr-only">
           Each arm against no onsystem for every model, each tier and all models, with 95% intervals
         </caption>
         <DeltaHead
@@ -376,9 +376,9 @@ function LabelsTable() {
     </>
   );
   return (
-    <Scroll table="labels">
+    <Scroll label="Blind labels by arm">
       <table data-table="labels" className="w-full min-w-[640px] text-left text-[13px]">
-        <caption id="labels-caption" className="sr-only">
+        <caption className="sr-only">
           The blind-labelled sample by arm, as the labeller counted it, with 95% intervals
         </caption>
         <thead className="bg-raised">
@@ -608,11 +608,12 @@ export default function BenchmarkPage() {
                 </p>
               </Prose>
               <Fold summary={`The ${String(benchmark.tasks.length)} prompts`}>
-                <ul className="grid gap-4 text-[14px] leading-relaxed">
+                {/* The prompts name long file paths, which break anywhere on a phone. */}
+                <ul className="grid gap-4 text-[14px] leading-relaxed [overflow-wrap:anywhere]">
                   {benchmark.repos.map((repo) => (
                     <li key={repo.name}>
                       <p className="font-mono text-[12.5px] text-fg-soft">{repo.name}</p>
-                      <ul className="mt-1.5 grid gap-1.5 text-muted [overflow-wrap:anywhere]">
+                      <ul className="mt-1.5 grid gap-1.5 text-muted">
                         {benchmark.tasks
                           .filter((task) => task.repo === repo.name)
                           .map((task) => (
@@ -626,11 +627,8 @@ export default function BenchmarkPage() {
             </Sub>
 
             <Sub title="The repositories">
-              <Scroll table="repositories">
+              <Scroll label="The repositories">
                 <table className="w-full min-w-[720px] text-left text-[13px]">
-                  <caption id="repositories-caption" className="sr-only">
-                    The repositories
-                  </caption>
                   <thead className="bg-raised">
                     <tr>
                       {['Repository', 'Commit', 'App', 'Design system', 'TypeScript'].map((l) => (
@@ -689,11 +687,8 @@ export default function BenchmarkPage() {
                 </p>
               </Prose>
               <div className="mt-4">
-                <Scroll table="model-list">
+                <Scroll label="The models">
                   <table className="w-full min-w-[560px] text-left text-[13px]">
-                    <caption id="model-list-caption" className="sr-only">
-                      The models
-                    </caption>
                     <thead className="bg-raised">
                       <tr>
                         {['Model', 'ID', 'Provider', 'Tier', 'Runs'].map((l) => (

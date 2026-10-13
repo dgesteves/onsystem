@@ -10,7 +10,7 @@ import RequiredCheckPage from '@/app/docs/required-check/page';
 import RulesPage from '@/app/rules/page';
 import { Code, wrapsLines } from '@/components/code';
 import { InlineMarkdown } from '@/components/markdown';
-import { MarkdownBlocks, parseBlocks, slug, type Block } from '@/components/markdown-blocks';
+import { MarkdownBlocks, parseBlocks, type Block } from '@/components/markdown-blocks';
 import { assistantLinks } from '@/components/page-actions';
 import { ruleCatalog } from '@/lib/data';
 import { DOCS_GROUPS, DOCS_NAV, DOCS_PAGES, docsPage } from '@/lib/docs';
@@ -133,15 +133,15 @@ describe('a docs page', () => {
     expect(page).toMatch(/<h2 id="the-skill" data-toc="What the skill tells Claude"/);
   });
 
-  it('gives each FAQ question an anchor, and names its section by the question alone', () => {
+  it('gives each FAQ question an anchor, outside the heading that names its section', () => {
     const page = render(createElement(FaqPage));
-    for (const [question] of FAQ) {
-      const id = slug(question);
-      expect(text(page)).toContain(`Link to the section ${question}`);
-      expect(page).toContain(`<section aria-labelledby="${id}-text">`);
-      const label = new RegExp(`<span id="${id}-text">([^<]*)</span>`).exec(page)?.[1];
-      expect(text(label ?? '')).toBe(question);
-    }
+    for (const [question] of FAQ) expect(text(page)).toContain(`Link to the section ${question}`);
+    const sections = [...page.matchAll(/<section aria-labelledby="([^"]+)">/g)].map(([, id]) => id);
+    const headings = [...page.matchAll(/<h2 id="([^"]+)"[^>]*>(.*?)<\/h2>/g)].map(
+      ([, id, inner = '']) => [id, text(inner)],
+    );
+    expect(headings.map(([id]) => id)).toEqual(sections);
+    expect(headings.map(([, name]) => name)).toEqual(FAQ.map(([question]) => question));
   });
 
   it('opens ChatGPT and Claude with a prompt that points at the page’s Markdown', () => {
@@ -346,12 +346,15 @@ describe('headings', () => {
     expect(html).toMatch(/<h4 id="deep" data-level="4"/);
   });
 
-  it('are named by their visible text alone, while the link keeps its own name', () => {
-    const html = markdown('## Config file');
+  it('keep the link out of the heading, so a heading is named by its text alone', () => {
+    const html = markdown('## Config file\n\n### `exclude`');
+    expect(html).toMatch(/<h2 id="config-file"[^>]*>Config file<\/h2><a href="#config-file"/);
     expect(html).toMatch(
-      /<h2 id="config-file"[^>]* aria-labelledby="config-file-text"><span id="config-file-text">Config file<\/span><a href="#config-file"/,
+      /<h3 id="exclude"[^>]*><code[^>]*>.*?exclude.*?<\/code><\/h3><a href="#exclude"/,
     );
-    expect(html).toContain('<span class="sr-only">Link to the section Config file</span>');
+    for (const [, inner = ''] of html.matchAll(/<h[234][^>]*>(.*?)<\/h[234]>/g)) {
+      expect(inner).not.toContain('Link to the section');
+    }
   });
 
   it('turn a details summary into an h3', () => {

@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { Code } from '@/components/code';
 import { AnchorHeading, plainLabel } from '@/components/heading';
 import { InlineMarkdown } from '@/components/markdown';
-import { ScrollRegion } from '@/components/scroll-region';
+import { TableScroll } from '@/components/table-scroll';
 import { Tabs } from '@/components/tabs';
 import type { Lang } from '@/lib/highlight';
 import { forPackageManager, PACKAGE_MANAGERS } from '@/lib/package-managers';
@@ -63,11 +63,6 @@ const CALLOUTS: Record<string, CalloutKind> = {
   WARNING: 'warning',
   CAUTION: 'warning',
 };
-
-/** A Markdown table's name, from its column headings, for the region it scrolls in. */
-export function tableLabel(header: string[]): string {
-  return `Table: ${header.map(plainLabel).filter(Boolean).join(', ')}`;
-}
 
 export function slug(text: string): string {
   return text
@@ -296,6 +291,12 @@ const CALLOUT_STYLES: Record<CalloutKind, { title: string; frame: string; label:
   },
 };
 
+/** A scrolling table's name: the heading it is under, as ondocs names its tables. */
+function tableLabel(blocks: Block[], index: number): string {
+  const heading = blocks.slice(0, index).findLast((block) => block.type === 'heading');
+  return heading?.type === 'heading' ? plainLabel(heading.text) : 'Table';
+}
+
 function Blocks({ blocks, shift }: { blocks: Block[]; shift: number }): ReactNode {
   return blocks.map((block, i) => {
     switch (block.type) {
@@ -418,7 +419,7 @@ function Blocks({ blocks, shift }: { blocks: Block[]; shift: number }): ReactNod
             </ul>
             {/* A table wider than the column scrolls rather than being cut off. */}
             <div className="hidden overflow-hidden rounded-xl border border-line sm:block">
-              <ScrollRegion label={tableLabel(block.header)}>
+              <TableScroll label={tableLabel(blocks, i)}>
                 <table className="w-full text-left text-[14px]">
                   <thead className="bg-raised">
                     <tr>
@@ -448,7 +449,7 @@ function Blocks({ blocks, shift }: { blocks: Block[]; shift: number }): ReactNod
                     ))}
                   </tbody>
                 </table>
-              </ScrollRegion>
+              </TableScroll>
             </div>
           </div>
         );

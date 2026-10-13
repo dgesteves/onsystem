@@ -1,4 +1,7 @@
-/** The FAQ: questions and answers in inline Markdown, rendered on /docs/faq and served as Markdown. */
+/**
+ * The FAQ: questions and answers in inline Markdown, rendered on /docs/faq, served as Markdown and
+ * indexed for Ask. scripts/generate.mjs loads this file as it is, so it imports nothing.
+ */
 export const FAQ: [question: string, answer: string][] = [
   [
     'Does my code leave my machine?',

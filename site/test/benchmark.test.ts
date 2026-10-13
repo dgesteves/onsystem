@@ -8,7 +8,6 @@ import { describe, expect, it } from 'vitest';
 import BenchmarkPage, { metadata } from '@/app/benchmark/page';
 import Home from '@/app/page';
 import sitemap from '@/app/sitemap';
-import { markOverflow } from '@/components/scroll-region';
 import { NAV } from '@/components/site-header';
 import { llmsTxt } from '@/lib/llms';
 
@@ -268,39 +267,6 @@ describe('/benchmark', () => {
     expect(text(top)).not.toMatch(/merge/i);
     expect(text(html)).not.toMatch(/mergeable/i);
     expect(text(html)).toContain('Would merge (labeller)');
-  });
-
-  it('names each wide table by a caption, for the region it scrolls in on a phone', () => {
-    // The tables with a minimum width; Markdown tables turn into cards on a phone instead.
-    const tables = html.split('<table').filter((table) => /^[^>]*min-w-\[/.test(table));
-    expect(tables.length).toBe(8);
-    for (const table of tables) expect(table).toMatch(/^[^>]*><caption id="[\w-]+-caption"/);
-    // Not a tab stop until the browser finds it wider than the screen.
-    expect(html).not.toMatch(/<div[^>]*tabindex[^>]*>\s*<table/);
-  });
-
-  it('makes a table a focusable, named region only while it overflows', () => {
-    const attributes = new Map<string, string>();
-    const element = {
-      scrollWidth: 720,
-      clientWidth: 358,
-      tabIndex: -1,
-      setAttribute: (name: string, value: string) => attributes.set(name, value),
-      removeAttribute: (name: string) => {
-        attributes.delete(name);
-        if (name === 'tabindex') element.tabIndex = -1;
-      },
-    };
-    markOverflow(element as unknown as HTMLElement, { labelledBy: 'arms-caption' });
-    expect(element.tabIndex).toBe(0);
-    expect(Object.fromEntries(attributes)).toEqual({
-      role: 'region',
-      'aria-labelledby': 'arms-caption',
-    });
-    element.clientWidth = 1100;
-    markOverflow(element as unknown as HTMLElement, { labelledBy: 'arms-caption' });
-    expect(element.tabIndex).toBe(-1);
-    expect(attributes.size).toBe(0);
   });
 
   it('links the transcripts release and how to reproduce it', () => {
