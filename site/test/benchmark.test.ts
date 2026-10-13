@@ -291,14 +291,14 @@ describe('/benchmark', () => {
         if (name === 'tabindex') element.tabIndex = -1;
       },
     };
-    markOverflow(element as unknown as HTMLElement, 'arms-caption');
+    markOverflow(element as unknown as HTMLElement, { labelledBy: 'arms-caption' });
     expect(element.tabIndex).toBe(0);
     expect(Object.fromEntries(attributes)).toEqual({
       role: 'region',
       'aria-labelledby': 'arms-caption',
     });
     element.clientWidth = 1100;
-    markOverflow(element as unknown as HTMLElement, 'arms-caption');
+    markOverflow(element as unknown as HTMLElement, { labelledBy: 'arms-caption' });
     expect(element.tabIndex).toBe(-1);
     expect(attributes.size).toBe(0);
   });

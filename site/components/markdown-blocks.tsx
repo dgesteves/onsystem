@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Code } from '@/components/code';
 import { AnchorHeading, plainLabel } from '@/components/heading';
 import { InlineMarkdown } from '@/components/markdown';
+import { ScrollRegion } from '@/components/scroll-region';
 import { Tabs } from '@/components/tabs';
 import type { Lang } from '@/lib/highlight';
 import { forPackageManager, PACKAGE_MANAGERS } from '@/lib/package-managers';
@@ -62,6 +63,11 @@ const CALLOUTS: Record<string, CalloutKind> = {
   WARNING: 'warning',
   CAUTION: 'warning',
 };
+
+/** A Markdown table's name, from its column headings, for the region it scrolls in. */
+export function tableLabel(header: string[]): string {
+  return `Table: ${header.map(plainLabel).filter(Boolean).join(', ')}`;
+}
 
 export function slug(text: string): string {
   return text
@@ -412,7 +418,7 @@ function Blocks({ blocks, shift }: { blocks: Block[]; shift: number }): ReactNod
             </ul>
             {/* A table wider than the column scrolls rather than being cut off. */}
             <div className="hidden overflow-hidden rounded-xl border border-line sm:block">
-              <div className="overflow-x-auto">
+              <ScrollRegion label={tableLabel(block.header)}>
                 <table className="w-full text-left text-[14px]">
                   <thead className="bg-raised">
                     <tr>
@@ -442,7 +448,7 @@ function Blocks({ blocks, shift }: { blocks: Block[]; shift: number }): ReactNod
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </ScrollRegion>
             </div>
           </div>
         );
