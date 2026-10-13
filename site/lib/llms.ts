@@ -1,6 +1,7 @@
 import { headlineText } from '@/lib/benchmark';
 import { benchmark, docs, readme, ruleCatalog, tools } from '@/lib/data';
 import { DOCS_PAGES } from '@/lib/docs';
+import { withoutMarkers } from '@/lib/markers';
 import {
   NPM,
   NPX,
@@ -20,11 +21,6 @@ export function absolute(markdown: string, page: string): string {
     if (target.startsWith('#')) return `](${SITE_URL}${page}${target})`;
     return `](${target.startsWith('/') ? `${SITE_URL}${target}` : target})`;
   });
-}
-
-/** The docs renderer's own markers (steps, package-manager tabs) mean nothing outside the site. */
-export function withoutMarkers(markdown: string): string {
-  return markdown.replace(/^<!-- \/?steps -->\n*/gm, '').replace(/^(```\w+) pm$/gm, '$1');
 }
 
 const summary =

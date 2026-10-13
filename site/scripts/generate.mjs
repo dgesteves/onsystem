@@ -10,6 +10,10 @@ import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
+// Two of the site's own modules, which import nothing, so Node loads them by stripping the types.
+import { faqMarkdown } from '../lib/faq.ts';
+import { withoutMarkers } from '../lib/markers.ts';
+
 let lib;
 try {
   lib = await import('onsystem');
@@ -911,8 +915,9 @@ write('social.json', {
 
 // ondocs's search index over the docs and the rules, for /api/ask and /api/mcp. Keyword-only
 // (BM25, no embedding model), so building it needs no API key and an agent's searches over MCP
-// call no model at all. The pages are those of DOCS_FILES in lib/site.ts; test/ask.test.ts keeps
-// the two lists in step.
+// call no model at all. The pages are those of DOCS_FILES in lib/site.ts, plus the FAQ;
+// test/ask.test.ts keeps the lists in step. The Markdown loses the renderer's own markers, as on
+// the site's .md pages and in llms-full.txt.
 const { buildIndex, fromMarkdown, serializeIndexFile } = await import('ondocs');
 const ASK_PAGES = {
   'quickstart.md': '/docs',
@@ -933,11 +938,12 @@ const ASK_PAGES = {
 const fence = (code, lang) => `\`\`\`${lang}\n${code.trimEnd()}\n\`\`\``;
 const askDocuments = [
   ...Object.entries(ASK_PAGES).map(([name, url]) =>
-    fromMarkdown(fs.readFileSync(path.join(repo, 'docs', name), 'utf8'), {
+    fromMarkdown(withoutMarkers(fs.readFileSync(path.join(repo, 'docs', name), 'utf8')), {
       id: `docs/${name}`,
       url,
     }),
   ),
+  fromMarkdown(`# FAQ\n\n${faqMarkdown()}`, { id: 'site/lib/faq.ts', url: '/docs/faq' }),
   // Each rule's page, from the same data the page renders.
   ...rules.map((rule) =>
     fromMarkdown(

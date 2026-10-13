@@ -9,12 +9,14 @@ import { GET as askStatusRoute, POST as askRoute } from '@/app/api/ask/route';
 import { DELETE as mcpDelete, GET as mcpGet, POST as mcpRoute } from '@/app/api/mcp/route';
 import { AskButton, askStatus, resetAskStatus } from '@/components/ask';
 import { DocsForAgents } from '@/components/docs-for-agents';
+import { slug } from '@/components/markdown-blocks';
 import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
 import index from '@/generated/ask-index.json';
 import { askEnabled } from '@/lib/ask';
 import { ruleCatalog } from '@/lib/data';
 import { DOCS_MCP } from '@/lib/docs-mcp';
+import { FAQ } from '@/lib/faq';
 import { llmsTxt } from '@/lib/llms';
 import { DOCS_FILES, SITE_URL } from '@/lib/site';
 
@@ -29,14 +31,28 @@ afterEach(() => {
 // ─── The index ──────────────────────────────────────────────────────────────
 
 describe('the docs index', () => {
-  it('holds every docs page and every rule, as the site serves them', () => {
+  it('holds every docs page, the FAQ and every rule, as the site serves them', () => {
     const urls = index.documents.map((doc) => doc.url).sort();
     expect(urls).toEqual(
       [
         ...Object.values(DOCS_FILES),
+        '/docs/faq',
         ...ruleCatalog.rules.map((rule) => `/rules/${rule.id}`),
       ].sort(),
     );
+  });
+
+  it('cites each FAQ answer by the anchor its question has on the page', () => {
+    const faq = index.documents.findIndex((doc) => doc.url === '/docs/faq');
+    const anchors = index.chunks.filter((c) => c.doc === faq).map((c) => c.anchor);
+    expect(anchors).toEqual(FAQ.map(([question]) => slug(question)));
+  });
+
+  it("leaves out the renderer's own markers, as the .md pages do", () => {
+    const text = index.chunks.map((chunk) => chunk.text).join('\n');
+    expect(text).toContain('npm install --save-dev onsystem');
+    expect(text).not.toMatch(/^```\w+ pm$/m);
+    expect(text).not.toContain('<!-- steps -->');
   });
 
   it('is keyword-only, so building and searching it calls no model', () => {

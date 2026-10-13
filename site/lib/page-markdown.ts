@@ -1,7 +1,8 @@
 import { docs } from '@/lib/data';
 import { docsMarkdown, docsSlug, type DocsPage } from '@/lib/docs';
 import { faqMarkdown } from '@/lib/faq';
-import { absolute, withoutMarkers } from '@/lib/llms';
+import { absolute } from '@/lib/llms';
+import { withoutMarkers } from '@/lib/markers';
 import { SITE_URL } from '@/lib/site';
 
 /** Where a docs page's Markdown is served: /docs/ci.md, and /docs/quickstart.md for /docs. */
