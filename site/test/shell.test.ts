@@ -81,6 +81,47 @@ describe('the theme', () => {
     }
   });
 
+  it.each([
+    ['light', 0],
+    ['dark', 1],
+  ] as const)('keeps highlighted code at 4.5:1 or more inside every finding mark, %s', (_, t) => {
+    const colours = [...css.matchAll(/\.tok-(\w+) \{\n {2}color: light-dark\((#\w+), (#\w+)\)/g)];
+    const marks = [
+      ...css.matchAll(
+        /\.mark-(\w+) \{[^}]*?background: color-mix\(in oklab, var\(--color-([\w-]+)\) (\d+)%, transparent\)/g,
+      ),
+    ];
+    expect(marks.map(([, kind]) => kind)).toEqual(['error', 'warning', 'changed', 'active']);
+    // The tint at its opacity, laid over the panel the code sits on (bg-code, or bg-raised in
+    // the landing page's demo), the way the browser composites it.
+    const over = (tint: string, alpha: number, surface: string) =>
+      `#${[1, 3, 5]
+        .map((i) => {
+          const [a, b] = [tint, surface].map((hex) => parseInt(hex.slice(i, i + 2), 16));
+          return Math.round((a ?? 0) * alpha + (b ?? 0) * (1 - alpha))
+            .toString(16)
+            .padStart(2, '0');
+        })
+        .join('')}`;
+    for (const surface of ['code', 'raised']) {
+      for (const [, mark, tint = '', percent = ''] of marks) {
+        const pair = tokens[tint] ?? { light: '', dark: '' };
+        const panel = tokens[surface] ?? { light: '', dark: '' };
+        const background = over(
+          t === 0 ? pair.light : pair.dark,
+          Number(percent) / 100,
+          t === 0 ? panel.light : panel.dark,
+        );
+        for (const [, kind, light = '', dark = ''] of colours) {
+          expect(
+            contrast(t === 0 ? light : dark, background),
+            `${kind} in mark-${mark} on ${surface}`,
+          ).toBeGreaterThanOrEqual(4.5);
+        }
+      }
+    }
+  });
+
   it('follows the OS until a theme is picked, and .light or .dark on <html> force one', () => {
     expect(css).toMatch(/:root \{\n {2}color-scheme: light dark;/);
     expect(css).toMatch(/\.light \{\n {2}color-scheme: light;/);

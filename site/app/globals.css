@@ -166,28 +166,31 @@ pre[data-more] {
   mask-image: linear-gradient(to left, transparent, #000 2.5rem);
 }
 
-/* Findings, underlined the way editors do. */
+/* Findings, underlined the way editors do. The tints stay at 6%, so every code colour keeps
+   4.5:1 on them in both themes; the underlines carry the meaning. */
 .mark-error {
   text-decoration: underline wavy var(--color-magenta);
   text-decoration-thickness: 1.5px;
   text-underline-offset: 4px;
   text-decoration-skip-ink: none;
-  background: color-mix(in oklab, var(--color-magenta) 10%, transparent);
+  background: color-mix(in oklab, var(--color-magenta) 6%, transparent);
 }
 .mark-warning {
   text-decoration: underline wavy var(--color-cyan);
   text-decoration-thickness: 1.5px;
   text-underline-offset: 4px;
   text-decoration-skip-ink: none;
-  background: color-mix(in oklab, var(--color-cyan) 8%, transparent);
+  background: color-mix(in oklab, var(--color-cyan) 6%, transparent);
 }
 .mark-changed {
-  background: color-mix(in oklab, var(--color-cyan) 14%, transparent);
+  background: color-mix(in oklab, var(--color-cyan) 6%, transparent);
   box-shadow: inset 0 -1.5px 0 color-mix(in oklab, var(--color-cyan) 55%, transparent);
   border-radius: 2px;
 }
 .mark-active {
-  background: color-mix(in oklab, var(--color-magenta) 24%, transparent);
+  background: color-mix(in oklab, var(--color-magenta) 6%, transparent);
+  box-shadow: inset 0 -2px 0 var(--color-magenta);
+  border-radius: 2px;
 }
 
 @keyframes rise {
