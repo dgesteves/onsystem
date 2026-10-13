@@ -612,7 +612,7 @@ export default function BenchmarkPage() {
                   {benchmark.repos.map((repo) => (
                     <li key={repo.name}>
                       <p className="font-mono text-[12.5px] text-fg-soft">{repo.name}</p>
-                      <ul className="mt-1.5 grid gap-1.5 text-muted">
+                      <ul className="mt-1.5 grid gap-1.5 text-muted [overflow-wrap:anywhere]">
                         {benchmark.tasks
                           .filter((task) => task.repo === repo.name)
                           .map((task) => (

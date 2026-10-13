@@ -12,6 +12,7 @@ import { GET as docsCard, generateStaticParams as cardParams } from '@/app/og/do
 import Home, { metadata as homeMetadata } from '@/app/page';
 import sitemap from '@/app/sitemap';
 import { docsMetadata } from '@/components/doc-page';
+import { INLINE_CODE } from '@/components/section';
 import { NAV } from '@/components/site-header';
 import { DOCS_PAGES, docsHeadings, docsMarkdown, docsSlug } from '@/lib/docs';
 import { lastModified } from '@/lib/git';
@@ -450,5 +451,29 @@ describe('the sitemap', () => {
         lastModified([page.source]) !== null,
       );
     }
+  });
+});
+
+// ─── Narrow screens ─────────────────────────────────────────────────────────
+
+describe('narrow screens', () => {
+  const source = (file: string) => fs.readFileSync(path.join(site, file), 'utf8');
+
+  it("lets the playground's findings shrink to the screen, the rule name truncating", () => {
+    const playground = source('components/playground.tsx');
+    // A grid's auto column grows to its widest finding; this one fits the panel instead.
+    expect(playground).toMatch(/<ol\s+className=\{`grid grid-cols-\[minmax\(0,1fr\)\]/);
+    expect(playground).toContain('<span className="truncate">{d.ruleId}</span>');
+  });
+
+  it("breaks the long paths in the benchmark's task list", () => {
+    expect(source('app/benchmark/page.tsx')).toContain(
+      '<ul className="mt-1.5 grid gap-1.5 text-muted [overflow-wrap:anywhere]">',
+    );
+  });
+
+  it('keeps a wrapped inline code pill inside the text column', () => {
+    // Padding cloned onto each line of a wrapped pill lands past the column edge.
+    expect(INLINE_CODE).not.toContain('box-decoration-clone');
   });
 });

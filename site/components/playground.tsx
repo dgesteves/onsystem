@@ -423,7 +423,9 @@ export function Playground({ presets, maxBytes }: { presets: Preset[]; maxBytes:
           )}
 
           {diagnostics.length > 0 && (
-            <ol className={`grid divide-y divide-line/70 ${pending || stale ? 'opacity-60' : ''}`}>
+            <ol
+              className={`grid grid-cols-[minmax(0,1fr)] divide-y divide-line/70 ${pending || stale ? 'opacity-60' : ''}`}
+            >
               {diagnostics.map((d, i) => (
                 <li
                   key={`${String(i)}-${d.ruleId}-${String(d.line)}-${String(d.column)}`}
@@ -453,9 +455,9 @@ export function Playground({ presets, maxBytes }: { presets: Preset[]; maxBytes:
                     ) : (
                       <a
                         href={ruleHref(d.ruleId)}
-                        className="inline-flex min-w-0 items-center gap-0.5 truncate text-muted hover:text-fg"
+                        className="inline-flex min-w-0 items-center gap-0.5 text-muted hover:text-fg"
                       >
-                        {d.ruleId}
+                        <span className="truncate">{d.ruleId}</span>
                         <ArrowUpRightIcon className="size-3 shrink-0" />
                       </a>
                     )}
