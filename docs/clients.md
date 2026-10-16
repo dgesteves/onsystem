@@ -1,12 +1,28 @@
 # Set up your agent
 
-The server speaks MCP over stdio, in both protocol eras: the 2026-07-28 revision (stateless, with `server/discover`) and the 2025 one (the `initialize` handshake), the era chosen by the client's first message. It finds the project from `--root`, a config file in the working directory, or the working directory itself when it holds a project (a `package.json` or `components.json`). MCP roots, which 2026-07-28 deprecates, are the fallback: when the working directory is none of those (Claude Desktop starts servers in `/`), a 2025-era client that reports roots has its first `file://` root used. When none of these gives a project (a client that starts servers in your home or the plugin's folder and reports no roots), each tool call's project is found from the absolute path it names, `path` (or `filename`, for `check_ui` with `code`): the nearest folder at or above it with a `package.json`, `components.json` or config, or the monorepo root above that, but never your home folder or the filesystem root. A project found this way loads a JSON config (`onsystem.config.json`) only: the server runs a JavaScript or TypeScript config only in a project it was started in. Until a call names one, the tools return an error that asks for it; after that, a call without one answers from the project found, as long as only one has been. Started at a [monorepo root](configuration.md#monorepo-roots), it serves every app and design-system package in it: the tools take the `path` of the file the agent is editing and answer for that file's project.
+Pick your client below and add the server. Run it from the project, or pass `--root` with the app's absolute path: [how the server finds your project](#how-the-server-finds-your-project) has the rest.
 
 Every client gets the same five tools, including `check_ui`, which the agent runs on its own output. Claude Code and Codex CLI also run the [plugin](plugin.md)'s hook, which checks each edit as it happens, so there use the plugin instead; with other agents, add the [CI check](ci.md) so what the agent skips still gets caught.
 
+> [!TIP]
+> **One `.mcp.json` for the team.** Commit this file at the repository root, and Claude Code, VS Code, GitHub Copilot CLI and Grok Build start the server from it once each person trusts the folder or approves the server:
+>
+> ```json
+> {
+>   "mcpServers": {
+>     "onsystem": {
+>       "command": "npx",
+>       "args": ["-y", "onsystem"]
+>     }
+>   }
+> }
+> ```
+>
+> It needs no `--root`: the server finds the project from the folder it starts in, the roots the client reports, or the files the tools are given. In Claude Code it registers the same tools as the plugin, so use it there instead of the plugin, not next to it; [Roll out to a team](rollout.md#give-every-agent-the-design-system) commits the plugin, hook included. Cursor and the other clients read their own files, below.
+
 ## Plugins for other agents
 
-The skill and the MCP server also come packaged for other agents, pinned to the same release as the Claude Code plugin. Only the Claude Code plugin has the hook that checks each edit, and Codex runs it too; elsewhere, the [CI check](ci.md) catches what the agent skips.
+The skill and the MCP server also come packaged for other agents, pinned to the same release as the Claude Code plugin. The hook that checks each edit runs in Claude Code and Codex CLI; elsewhere, the [CI check](ci.md) catches what the agent skips.
 
 - **Any agent with Agent Skills** (Claude Code, Codex, Cursor, GitHub Copilot, Gemini CLI, OpenCode and others): the skill, from the repository. It goes to `.agents/skills/onsystem`, which most agents read, and is linked into `.claude/skills` for Claude Code. Add the MCP server with your client's config below.
 
@@ -21,13 +37,14 @@ The skill and the MCP server also come packaged for other agents, pinned to the 
   codex plugin add onsystem@dgesteves
   ```
 
-- **GitHub Copilot CLI:** the [Agent Plugins 1.0](https://github.com/agentplugins/agent-plugins-spec) package, with the server and the skill:
+- **GitHub Copilot CLI:** Copilot CLI reads the same marketplace as Claude Code and installs that plugin's server and skill. Install it from the marketplace: Copilot CLI has deprecated installing a plugin straight from a repository.
 
   ```sh
-  copilot plugin install dgesteves/onsystem:plugins/onsystem-agent
+  copilot plugin marketplace add dgesteves/onsystem
+  copilot plugin install onsystem@dgesteves
   ```
 
-- **VS Code** (GitHub Copilot agent plugins): run **Chat: Install Plugin From Source** from the Command Palette and enter `dgesteves/onsystem`. VS Code reads the same marketplace as Claude Code and installs that plugin's server and skill. To use the Agent Plugins package instead, add a clone's `plugins/onsystem-agent` folder to the `chat.pluginLocations` setting.
+- **VS Code** (GitHub Copilot agent plugins): run **Chat: Install Plugin From Source** from the Command Palette and enter `dgesteves/onsystem`. VS Code reads the same marketplace as Claude Code and installs that plugin's server and skill. To use the [Agent Plugins 1.0](https://github.com/agentplugins/agent-plugins-spec) package instead, add a clone's `plugins/onsystem-agent` folder to the `chat.pluginLocations` setting.
 - **Cursor:** the Cursor plugin, in `plugins/onsystem-cursor`. Until it is listed in the Cursor Marketplace, copy that folder to `~/.cursor/plugins/local/onsystem` and run **Developer: Reload Window**.
 
 A client that loads the Agent Plugins format starts the server in the plugin's folder rather than in your project, so the server finds the project through the workspace roots the client reports, as VS Code and Cursor do. If a client reports none, the server finds the project from the absolute path of the file the agent passes to the tools, and asks for one when a call has none. To have it found from the start, add the server with the client's MCP config below instead.
@@ -138,7 +155,7 @@ That writes `~/.copilot/mcp-config.json`:
 }
 ```
 
-In a session, `/mcp show onsystem` lists its tools.
+In a session, `/mcp show onsystem` lists its tools. Copilot CLI also reads the team's `.mcp.json` (or `.github/mcp.json`) in a folder you trust.
 
 </details>
 
@@ -206,7 +223,31 @@ In Zed's `settings.json`:
 <details>
 <summary><strong>Gemini CLI</strong></summary>
 
-`.gemini/settings.json` in the project, or `~/.gemini/settings.json` for every project:
+```sh
+gemini mcp add -s user onsystem npx -y onsystem --root /absolute/path/to/app
+```
+
+That writes `~/.gemini/settings.json`, for every project; without `-s user`, it writes `.gemini/settings.json` in the project:
+
+```json
+{
+  "mcpServers": {
+    "onsystem": {
+      "command": "npx",
+      "args": ["-y", "onsystem", "--root", "/absolute/path/to/app"]
+    }
+  }
+}
+```
+
+Gemini CLI starts MCP servers only in trusted folders: trust the project when Gemini CLI asks, or later with `/permissions`. Until then, `gemini mcp list` shows onsystem as Disabled, even from the user file. A headless run (`gemini -p`) cannot ask: pass `--skip-trust`, or set `GEMINI_CLI_TRUST_WORKSPACE=true`.
+
+</details>
+
+<details>
+<summary><strong>Antigravity (CLI and IDE)</strong></summary>
+
+Antigravity CLI replaced Gemini CLI for unpaid-tier and Google One users in June 2026, and it keeps MCP servers in a different file: the CLI and the IDE both read `~/.gemini/config/mcp_config.json` for every project, or `.agents/mcp_config.json` in the project. In the IDE, open the file from the **…** menu of the agent panel: **MCP Servers**, then **Manage MCP Servers**, then **View raw config**. In the CLI, `/mcp` opens the MCP manager.
 
 ```json
 {
@@ -249,21 +290,18 @@ Use this instead of the plugin, not next to it: both register the same tools.
 claude mcp add onsystem -- npx -y onsystem
 ```
 
-To share it with your team, add `--scope project`, which writes `.mcp.json` at the repository root:
-
-```json
-{
-  "mcpServers": {
-    "onsystem": {
-      "command": "npx",
-      "args": ["-y", "onsystem"]
-    }
-  }
-}
-```
+To share it with your team, add `--scope project`, which writes the same entry to `.mcp.json` at the repository root: the file at the top of this page.
 
 </details>
 
 Any other MCP client: run `npx -y onsystem --root /absolute/path/to/app` as a stdio server. On native Windows, wrap it as `cmd /c npx ...`.
 
 The server sends usage instructions in its `initialize` result and in `server/discover`. Clients that ignore them benefit from one line in `CLAUDE.md`, `AGENTS.md` or `.cursor/rules`: _"Before writing UI, use the onsystem tools. Run check_ui on every file you change and fix all errors."_ Run in a terminal, `onsystem init` offers to add a short section that says so to the project's `AGENTS.md` or `CLAUDE.md`, with `npx -y onsystem check <file>` for agents without the tools. It sits between `BEGIN:onsystem-agent-rules` and `END:onsystem-agent-rules` comment markers, which a later run updates in place.
+
+## How the server finds your project
+
+The server finds the project from `--root`, a config file in the working directory, or the working directory itself when it holds a project (a `package.json` or `components.json`). Started at a [monorepo root](configuration.md#monorepo-roots), it serves every app and design-system package in it: the tools take the `path` of the file the agent is editing and answer for that file's project.
+
+MCP roots, which the 2026-07-28 protocol revision deprecates, are the fallback: when the working directory holds no project (Claude Desktop starts servers in `/`), a 2025-era client that reports roots has its first `file://` root used. When none of these gives a project (a client that starts servers in your home or the plugin's folder and reports no roots), each tool call's project is found from the absolute path it names, `path` (or `filename`, for `check_ui` with `code`): the nearest folder at or above it with a `package.json`, `components.json` or config, or the monorepo root above that, but never your home folder or the filesystem root. A project found this way loads a JSON config (`onsystem.config.json`) only: the server runs a JavaScript or TypeScript config only in a project it was started in. Until a call names one, the tools return an error that asks for it; after that, a call without one answers from the project found, as long as only one has been.
+
+The server speaks MCP over stdio, in both protocol eras: the 2026-07-28 revision (stateless, with `server/discover`) and the 2025 one (the `initialize` handshake), the era chosen by the client's first message.
