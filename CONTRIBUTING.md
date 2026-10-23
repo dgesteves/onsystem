@@ -2,6 +2,12 @@
 
 Bug reports with a minimal snippet and the `inspect` output are the most useful contribution: most fixes start from one. For a change in behaviour, open an issue first so we can agree on it before you write it.
 
+## New integrations
+
+For the first four weeks after the public launch, we add no new integration (a client, a framework or another way to install or run onsystem) unless a user asks for it in an issue. That time goes to the integrations onsystem already has. To ask for one, [open an issue](https://github.com/dgesteves/onsystem/issues) that names it and says what you would use it for.
+
+Fixes to the existing integrations are welcome at any time. So is checking a Tier 2 setup in the [support tiers](docs/clients.md#support-tiers): run it in the client, then open a pull request that moves its row to Tier 1 with the client's version, the date and what you saw (`test/support-tiers-docs.test.ts` lists the Tier 1 setups too).
+
 ## Setup
 
 Node.js 22.18 or later (24 in `.nvmrc`) and pnpm, which Corepack provides at the version `package.json` names:

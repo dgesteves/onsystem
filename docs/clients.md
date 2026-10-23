@@ -2,7 +2,7 @@
 
 Pick your client below and add the server. Run it from the project, or pass `--root` with the app's absolute path: [how the server finds your project](#how-the-server-finds-your-project) has the rest.
 
-Every client gets the same five tools, including `check_ui`, which the agent runs on its own output. Claude Code and Codex CLI also run the [plugin](plugin.md)'s hook, which checks each edit as it happens, so there use the plugin instead; with other agents, add the [CI check](ci.md) so what the agent skips still gets caught.
+Every client gets the same five tools, including `check_ui`, which the agent runs on its own output. Claude Code and Codex CLI also run the [plugin](plugin.md)'s hook, which checks each edit as it happens, so there use the plugin instead; with other agents, add the [CI check](ci.md) so what the agent skips still gets caught. Not every setup below has been run in its client yet: [Support tiers](#support-tiers) says which have.
 
 > [!TIP]
 > **One `.mcp.json` for the team.** Commit this file at the repository root, and VS Code, GitHub Copilot CLI and Grok Build start the server from it once each person trusts the folder or approves the server:
@@ -53,7 +53,7 @@ A client that loads the Agent Plugins format starts the server in the plugin's f
 
 ## Cursor and VS Code
 
-One click installs it: [Install in Cursor](https://cursor.com/en/install-mcp?name=onsystem&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIm9uc3lzdGVtIiwiLS1yb290IiwiJHt3b3Jrc3BhY2VGb2xkZXJ9Il19) or [Install in VS Code](https://insiders.vscode.dev/redirect/mcp/install?name=onsystem&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22onsystem%22%2C%22--root%22%2C%22%24%7BworkspaceFolder%7D%22%5D%7D). To share it with the team, commit the config instead:
+One click installs it: [Install in Cursor](https://cursor.com/en/install-mcp?name=onsystem&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIm9uc3lzdGVtIiwiLS1yb290IiwiJHt3b3Jrc3BhY2VGb2xkZXJ9Il19) or [Install in VS Code](https://insiders.vscode.dev/redirect/mcp/install?name=onsystem&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22onsystem%22%2C%22--root%22%2C%22%24%7BworkspaceFolder%7D%22%5D%7D). To share it with the team, commit a file instead: `.cursor/mcp.json` for Cursor, and for VS Code the `.mcp.json` at the top of this page.
 
 <details open>
 <summary><strong>Cursor</strong></summary>
@@ -76,7 +76,7 @@ One click installs it: [Install in Cursor](https://cursor.com/en/install-mcp?nam
 <details open>
 <summary><strong>VS Code (Copilot agent mode)</strong></summary>
 
-`.vscode/mcp.json`:
+Commit the `.mcp.json` at the top of this page: VS Code reads it, and its docs now call the older `.vscode/mcp.json` deprecated. Commit one or the other, not both: VS Code reads both, so it can start the server twice. A repository that already keeps its servers in the older file adds this to `.vscode/mcp.json`:
 
 ```json
 {
@@ -299,6 +299,33 @@ To share it with your team, add `--scope project`, which writes the same entry t
 Any other MCP client: run `npx -y onsystem --root /absolute/path/to/app` as a stdio server. On native Windows, wrap it as `cmd /c npx ...`.
 
 The server sends usage instructions in its `initialize` result and in `server/discover`. Clients that ignore them benefit from one line in `CLAUDE.md`, `AGENTS.md` or `.cursor/rules`: _"Before writing UI, use the onsystem tools. Run check_ui on every file you change and fix all errors."_ Run in a terminal, `onsystem init` offers to add a short section that says so to the project's `AGENTS.md` or `CLAUDE.md`, with `npx -y onsystem check <file>` for agents without the tools. It sits between `BEGIN:onsystem-agent-rules` and `END:onsystem-agent-rules` comment markers, which a later run updates in place.
+
+## Support tiers
+
+Every setup on this page follows the client's own docs, but not every one has been run in that client:
+
+- **Tier 1, tested:** CI runs it on every pull request, or the setup as these docs give it was run in the client and worked.
+- **Tier 2, documented:** written from the client's docs, and not run in the client yet, or only installed. It should work; if it does not, [open an issue](https://github.com/dgesteves/onsystem/issues) with the client's version.
+
+| Setup                           | Tier | Last checked                                 | What was checked                                                                                                                                                                                                                                                       |
+| ------------------------------- | ---- | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The MCP server over stdio       | 1    | Every pull request                           | `pnpm smoke` starts the built server as a client does and calls every tool with the MCP SDK's clients, in both protocol eras. `pnpm pack-test` runs the handshake with the packed package on Linux, Windows and macOS.                                                 |
+| Claude Code plugin              | 1    | 2026-10-21, Claude Code 2.1.299              | `claude mcp list` showed the plugin's server connected ([#185](https://github.com/dgesteves/onsystem/pull/185)). CI runs the plugin's hook on every pull request, with input shaped like Claude Code's.                                                                |
+| Claude Code without the plugin  | 1    | 2026-10-21, Claude Code 2.1.299              | `claude mcp add --scope project` wrote the `.mcp.json` at the top of this page, and `claude mcp list` showed the server connected ([#185](https://github.com/dgesteves/onsystem/pull/185)).                                                                            |
+| Gemini CLI                      | 1    | 2026-10-16, Gemini CLI 0.64.0                | `gemini mcp add` wrote the config shown, and `gemini mcp list` showed the server connected in a trusted folder ([#185](https://github.com/dgesteves/onsystem/pull/185)).                                                                                               |
+| Agent Skills (`npx skills add`) | 1    | 2026-10-10, skills 1.7.2                     | It installed the skill in `.agents/skills/onsystem` and linked it into `.claude/skills` ([#73](https://github.com/dgesteves/onsystem/pull/73)).                                                                                                                        |
+| Codex CLI                       | 2    | 2026-10-16, Codex CLI 0.163.0, install only  | The plugin installed from the marketplace, and `codex mcp add` wrote the config shown ([#185](https://github.com/dgesteves/onsystem/pull/185)). Neither the server nor the hook has been run in Codex; CI tests the hook with input shaped like Codex's `apply_patch`. |
+| GitHub Copilot CLI              | 2    | 2026-10-16, Copilot CLI 1.0.98, install only | The plugin installed from the marketplace, and `copilot mcp list` listed its server and the one in a trusted folder's `.mcp.json` ([#185](https://github.com/dgesteves/onsystem/pull/185)). Neither was started.                                                       |
+| Grok Build                      | 2    | 2026-10-09, Grok Build 1.0.50                | `grok mcp doctor` started the server and found its five tools, before the package was renamed onsystem ([#34](https://github.com/dgesteves/onsystem/pull/34)).                                                                                                         |
+| Cursor                          | 2    | Not yet                                      | The plugin passes the checks of Cursor's plugin template ([#73](https://github.com/dgesteves/onsystem/pull/73)). Neither it nor `.cursor/mcp.json` has been run in Cursor.                                                                                             |
+| VS Code                         | 2    | Not yet                                      | From VS Code's docs.                                                                                                                                                                                                                                                   |
+| Claude Desktop                  | 2    | Not yet                                      | From Claude Desktop's docs.                                                                                                                                                                                                                                            |
+| Windsurf (Devin Desktop)        | 2    | Not yet                                      | From the Devin Desktop and Devin CLI docs.                                                                                                                                                                                                                             |
+| JetBrains IDEs                  | 2    | Not yet                                      | From the AI Assistant and Junie docs.                                                                                                                                                                                                                                  |
+| Zed                             | 2    | Not yet                                      | From Zed's docs.                                                                                                                                                                                                                                                       |
+| Antigravity                     | 2    | Not yet                                      | From Antigravity's docs.                                                                                                                                                                                                                                               |
+
+The CLI, the [GitHub Action](ci.md) and the [ESLint plugin](eslint.md) are not agent setups: CI runs all three on every pull request. To move a setup to Tier 1, run it in the client and open a pull request that updates its row with the client's version, the date and what you saw.
 
 ## How the server finds your project
 
