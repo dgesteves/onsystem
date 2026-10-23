@@ -1,7 +1,19 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import { McpServer, ResourceTemplate, type CallToolResult } from '@modelcontextprotocol/server';
+import {
+  McpServer,
+  ResourceTemplate,
+  type CallToolResult,
+  type GetPromptResult,
+  type PromptCallback,
+  type ReadResourceResult,
+  type ResourceMetadata,
+  type StandardSchemaWithJSON,
+  type ToolAnnotations,
+  type ToolCallback,
+  type Variables,
+} from '@modelcontextprotocol/server';
 import * as z from 'zod';
 
 import type { Catalog, CatalogEntry, ProjectSet, ServedProject } from '../catalog.js';
@@ -14,10 +26,14 @@ import { TOKEN_CATEGORIES, type ComponentInfo } from '../types.js';
 import { isInside, relativePath, SCRIPT_FILE } from '../util/paths.js';
 import { NAME, VERSION } from '../version.js';
 import {
+  answer,
+  type Answer,
   capDiagnostics,
   importStatement,
+  json,
   listComponents,
   noComponentsMessage,
+  pathOf,
   type Listing,
   renderAmbiguous,
   renderCatalogList,
@@ -26,8 +42,11 @@ import {
   renderCheck,
   renderComponent,
   renderComponentList,
+  renderNotFound,
+  renderPrompt,
   renderSearch,
   renderTokens,
+  resourceDescription,
 } from './render.js';
 
 export const INSTRUCTIONS = `This server describes the project's design system: its React components (props, variants, parts), design tokens and usage docs, and lints UI code against it.
@@ -62,8 +81,8 @@ const MAX_LIMIT = 1000;
  * check_ui's answer for a path or filename that is not JS or TS. `fix`: what to do instead,
  * for a `filename` given with code (the code itself may be fine).
  */
-function notScript(name: string, fix = ''): CallToolResult {
-  return errorResult(
+function notScript(name: string, fix = ''): Reply {
+  return failure(
     `check_ui checks .tsx, .jsx, .ts and .js files; ${name} is not one, so it was not checked.${fix}`,
   );
 }
@@ -170,6 +189,28 @@ const componentSchema = {
     .optional(),
   classNames: z.array(z.string()),
   cssVars: z.array(z.string()),
+  // What a component read from a package's type declarations (MUI's, a design-system
+  // package's) has besides: without them, a client that checks the output schema rejects it.
+  library: z
+    .string()
+    .optional()
+    .describe('The published package it is read from, by its type declarations: "@mui/material".'),
+  polymorphic: z
+    .string()
+    .optional()
+    .describe(
+      'A prop that renders another element or component in its place, with its props: "component".',
+    ),
+  defaultImport: z
+    .string()
+    .optional()
+    .describe('Another module that exports it as its default: "@mui/material/Button".'),
+  labelsChild: z
+    .object({ prop: z.string(), unless: z.string().optional() })
+    .optional()
+    .describe(
+      "A prop whose text is its child element's accessible name (MUI Tooltip's title), unless `unless` is set.",
+    ),
   import: z.string().describe('The import statement to use.'),
   tokens: z.array(z.string()).describe('Names of the design tokens its classes use.'),
   ...originShape,
@@ -248,8 +289,167 @@ function listOf(items: readonly string[], max: number): string {
   return `${items.slice(0, max).join(', ')} and ${items.length - max} more`;
 }
 
-function errorResult(text: string): CallToolResult {
-  return { isError: true, content: [{ type: 'text', text }] };
+// The response boundary. Every text this server sends about the project is an `Answer`, which
+// only `answer()` in render.ts makes: a tool's text through `reply` or `refuse`, a resource's
+// through `contents`, the prompt's through `prompted`, a resource's description through
+// `resourceDescription`, and what a handler throws, whatever its message holds (a config key, a
+// path), through `guard` and `rethrown`. Every tool, resource and prompt is registered through
+// `Registrar`, which wraps each handler in one of those two, and each handler's return type takes
+// only what those make. So no line of it starts with text the repository wrote, unmarked, and
+// nothing is appended to an answer after it is built.
+
+declare const SENT: unique symbol;
+/** A tool result that `reply` or `refuse` made, so its text is an `Answer`. */
+type Reply = CallToolResult & { readonly [SENT]: true };
+/** A resource read that `contents` made. */
+type Contents = ReadResourceResult & { readonly [SENT]: true };
+/** A prompt that `prompted` made. */
+type Prompted = GetPromptResult & { readonly [SENT]: true };
+
+function reply(text: Answer, structuredContent: Record<string, unknown>): Reply {
+  const result: CallToolResult = { content: [{ type: 'text', text }], structuredContent };
+  return result as Reply;
+}
+
+function refuse(text: Answer): Reply {
+  const result: CallToolResult = { isError: true, content: [{ type: 'text', text }] };
+  return result as Reply;
+}
+
+/** An error result for `message` on one line: any line break in it is escaped. */
+function failure(message: string): Reply {
+  return refuse(answer([message]));
+}
+
+/** Thrown with an answer to send as it is (an ambiguous name's list), not as one line. */
+class AnswerError extends Error {
+  constructor(readonly answer: Answer) {
+    super(answer);
+  }
+}
+
+/** What an error says, as an answer: an `AnswerError`'s answer, or its message on one line. */
+function errorText(error: unknown): Answer {
+  if (error instanceof AnswerError) return error.answer;
+  return answer([error instanceof Error ? error.message : String(error)]);
+}
+
+/** Runs a tool's handler; what it throws is an error result whose text is an answer too. */
+async function guard(handler: () => Promise<Reply>): Promise<CallToolResult> {
+  try {
+    return await handler();
+  } catch (error) {
+    return refuse(errorText(error));
+  }
+}
+
+/** Runs a resource or completion handler; what it throws, it throws with an answer. */
+async function rethrown<T>(handler: () => Promise<T>): Promise<T> {
+  try {
+    return await handler();
+  } catch (error) {
+    throw new Error(errorText(error), { cause: error });
+  }
+}
+
+/** A component in the resource list: its description is an answer, its name an identifier. */
+interface ListedResource {
+  uri: string;
+  name: string;
+  title: string;
+  description?: Answer;
+  mimeType: string;
+}
+
+/** What a handler is given: the arguments its schema parses. */
+type Parsed<S extends StandardSchemaWithJSON> = StandardSchemaWithJSON.InferOutput<S>;
+
+/**
+ * Registers the server's tools, resources and prompts, each handler wrapped at the response
+ * boundary: a tool's in `guard`, so what it throws is an error result whose text is an answer;
+ * a resource's, its listing's, a completion's and the prompt's in `rethrown`, so what they throw
+ * carries an answer. Each handler's type takes only what `reply`, `refuse`, `contents` and
+ * `prompted` make. `createServer` registers through it alone.
+ */
+class Registrar {
+  constructor(private readonly server: McpServer) {}
+
+  tool<Input extends StandardSchemaWithJSON>(
+    name: string,
+    config: {
+      title: string;
+      description: string;
+      inputSchema: Input;
+      outputSchema: StandardSchemaWithJSON;
+      annotations: ToolAnnotations;
+    },
+    handler: (args: Parsed<Input>) => Promise<Reply>,
+  ): void {
+    const run = (args: Parsed<Input>) => guard(() => handler(args));
+    // The SDK's callback type is conditional on the schema, which TypeScript cannot resolve for
+    // a generic one: `run` is that callback for a schema, which `Input` always is.
+    this.server.registerTool(name, config, run as ToolCallback<Input>);
+  }
+
+  resource(
+    name: string,
+    uri: string,
+    config: ResourceMetadata,
+    read: (uri: URL) => Promise<Contents>,
+  ): void {
+    this.server.registerResource(name, uri, config, (url) => rethrown(() => read(url)));
+  }
+
+  /** A resource template: its `uri` with `{variables}`, how to list it and to complete each one. */
+  template(
+    name: string,
+    template: {
+      uri: string;
+      list: () => Promise<{ resources: ListedResource[] }>;
+      complete: Record<string, (value: string) => Promise<string[]>>;
+    },
+    config: ResourceMetadata,
+    read: (uri: URL, variables: Variables) => Promise<Contents>,
+  ): void {
+    const complete = Object.fromEntries(
+      Object.entries(template.complete).map(([variable, values]) => [
+        variable,
+        (value: string) => rethrown(() => values(value)),
+      ]),
+    );
+    const list = () => rethrown(template.list);
+    this.server.registerResource(
+      name,
+      new ResourceTemplate(template.uri, { list, complete }),
+      config,
+      (url, variables) => rethrown(() => read(url, variables)),
+    );
+  }
+
+  prompt<Args extends StandardSchemaWithJSON>(
+    name: string,
+    config: { title: string; description: string; argsSchema: Args },
+    handler: (args: Parsed<Args>) => Promise<Prompted>,
+  ): void {
+    const run = (args: Parsed<Args>): Promise<GetPromptResult> => rethrown(() => handler(args));
+    // As for a tool's callback.
+    this.server.registerPrompt(name, config, run as PromptCallback<Args>);
+  }
+}
+
+/** A resource's contents, whose text is an answer. */
+function contents(uri: URL, mimeType: string, text: Answer): Contents {
+  const result: ReadResourceResult = { contents: [{ uri: uri.href, mimeType, text }] };
+  return result as Contents;
+}
+
+/** A prompt's one message, whose text is an answer. */
+function prompted(description: string, text: Answer): Prompted {
+  const result: GetPromptResult = {
+    description,
+    messages: [{ role: 'user', content: { type: 'text', text } }],
+  };
+  return result as Prompted;
 }
 
 function origin(entry: CatalogEntry): { package: string; projects: string[] } {
@@ -296,18 +496,9 @@ function listContent<T>(
   };
 }
 
-/**
- * Said above a component asked for by a name that is not how its design system writes it:
- * `Card.Header` finds CardHeader, and code written as asked would not compile.
- */
-function nameNotice(asked: string, component: ComponentInfo): string {
-  if (asked === component.name || component.aliases.includes(asked)) return '';
-  if (!asked.includes('.') && !component.name.includes('.')) return '';
-  return `There is no \`${asked}\` in this design system: write \`<${component.name}>\`.\n\n`;
-}
-
-function resourceDescription(component: ComponentInfo): { description?: string } {
-  const description = descriptionOf(component);
+/** A resource's description: the first sentence of the component's, quoted when it is the repository's. */
+function describedAs(component: ComponentInfo): { description?: Answer } {
+  const description = resourceDescription(component);
   return description ? { description } : {};
 }
 
@@ -326,7 +517,7 @@ function result(hit: SearchHit) {
 }
 
 /** Builds the MCP server: five tools, two resources and one prompt. Transport-agnostic. */
-export function createServer({ getDesignSystem, getProjects }: CreateServerOptions): McpServer {
+export function createServer(options: CreateServerOptions): McpServer {
   const server = new McpServer(
     { name: NAME, title: 'onsystem', version: VERSION },
     {
@@ -345,7 +536,15 @@ export function createServer({ getDesignSystem, getProjects }: CreateServerOptio
       },
     },
   );
+  register(new Registrar(server), options);
+  return server;
+}
 
+/**
+ * Registers the tools, resources and prompt through `serve`, the only way here to the server (no
+ * `McpServer` is in scope), so each handler is wrapped at the response boundary.
+ */
+function register(serve: Registrar, { getDesignSystem, getProjects }: CreateServerOptions): void {
   /** The design system for `target` at a workspace root, or the merged catalog without one. */
   const scope = async (target?: string): Promise<Scope> => {
     const set = await getProjects?.(target);
@@ -357,14 +556,14 @@ export function createServer({ getDesignSystem, getProjects }: CreateServerOptio
     return { set, catalog: await set.catalog() };
   };
   /** `scope`, with a path outside the workspace as an error result instead of a throw. */
-  const scoped = async (target?: string): Promise<Scope | CallToolResult> => {
+  const scoped = async (target?: string): Promise<Scope | Reply> => {
     try {
       return await scope(target);
     } catch (error) {
-      return errorResult((error as Error).message);
+      return refuse(errorText(error));
     }
   };
-  const isResult = (value: Scope | CallToolResult): value is CallToolResult => 'content' in value;
+  const isResult = (value: Scope | Reply): value is Reply => 'content' in value;
   /** `scope` without a target, for listings: none yet, when no project is known. */
   const listed = async (): Promise<Scope | undefined> => {
     try {
@@ -375,7 +574,7 @@ export function createServer({ getDesignSystem, getProjects }: CreateServerOptio
     }
   };
 
-  server.registerTool(
+  serve.tool(
     'list_components',
     {
       title: 'List design-system components',
@@ -434,7 +633,7 @@ export function createServer({ getDesignSystem, getProjects }: CreateServerOptio
       }),
       annotations: READ_ONLY,
     },
-    async ({ query, kind, limit, path: target }): Promise<CallToolResult> => {
+    async ({ query, kind, limit, path: target }) => {
       const found = await scoped(target);
       if (isResult(found)) return found;
       const filter = { query, kind, limit };
@@ -446,21 +645,21 @@ export function createServer({ getDesignSystem, getProjects }: CreateServerOptio
           filter,
           (entry) => entry.package,
         );
-        return {
-          content: [{ type: 'text', text: renderCatalogList(catalog, filter) }],
-          structuredContent: listContent(listed, (entry) => entry.component, origin),
-        };
+        return reply(
+          renderCatalogList(catalog, filter),
+          listContent(listed, (entry) => entry.component, origin),
+        );
       }
       const { ds } = found;
       const listed = listComponents(ds.roots(), (c) => c, filter);
-      return {
-        content: [{ type: 'text', text: renderComponentList(ds, found.project?.dir, filter) }],
-        structuredContent: listContent(listed, (c) => c),
-      };
+      return reply(
+        renderComponentList(ds, found.project?.dir, filter),
+        listContent(listed, (c) => c),
+      );
     },
   );
 
-  server.registerTool(
+  serve.tool(
     'get_component',
     {
       title: 'Get a component contract',
@@ -477,7 +676,7 @@ export function createServer({ getDesignSystem, getProjects }: CreateServerOptio
       outputSchema: z.object(componentSchema),
       annotations: READ_ONLY,
     },
-    async ({ name, path: target }): Promise<CallToolResult> => {
+    async ({ name, path: target }) => {
       const found = await scoped(target);
       if (isResult(found)) return found;
       if ('catalog' in found) {
@@ -486,77 +685,40 @@ export function createServer({ getDesignSystem, getProjects }: CreateServerOptio
         const [entry] = matches;
         if (!entry) {
           if (!catalog.roots().length) {
-            return errorResult(noComponentsMessage(catalog.root, undefined, true));
+            return refuse(noComponentsMessage(catalog.root, undefined, true));
           }
-          const guess = catalog.suggest(name);
           const names = [...new Set(catalog.roots().map((e) => e.component.name))];
-          return errorResult(
-            `No component named "${name}" in any project.` +
-              (guess ? ` Did you mean "${guess}"?` : '') +
-              ` Available: ${names.join(', ')}.`,
-          );
+          return refuse(renderNotFound(name, catalog.suggest(name), names, ' in any project'));
         }
-        if (matches.length > 1) return errorResult(renderAmbiguous(name, matches));
+        if (matches.length > 1) return refuse(renderAmbiguous(name, matches));
         const description = descriptionOf(entry.component);
-        return {
-          content: [
-            {
-              type: 'text',
-              text:
-                nameNotice(name, entry.component) +
-                renderComponent(entry.ds, entry.component, entry),
-            },
-          ],
-          structuredContent: {
-            ...entry.component,
-            ...(description ? { description } : {}),
-            import: importStatement(entry.component),
-            tokens: entry.ds.relatedTokens(entry.component).map((t) => t.name),
-            ...origin(entry),
-          },
-        };
+        return reply(renderComponent(entry.ds, entry.component, entry, name), {
+          ...entry.component,
+          ...(description ? { description } : {}),
+          import: importStatement(entry.component),
+          tokens: entry.ds.relatedTokens(entry.component).map((t) => t.name),
+          ...origin(entry),
+        });
       }
       const { ds } = found;
       const component = ds.getComponent(name);
       if (!component) {
-        if (!ds.roots().length) {
-          return {
-            isError: true,
-            content: [{ type: 'text', text: noComponentsMessage(ds.root, found.project?.dir) }],
-          };
-        }
-        const guess = ds.suggestComponent(name);
-        return {
-          isError: true,
-          content: [
-            {
-              type: 'text',
-              text:
-                `No component named "${name}".` +
-                (guess ? ` Did you mean "${guess}"?` : '') +
-                ` Available: ${ds
-                  .roots()
-                  .map((c) => c.name)
-                  .join(', ')}.`,
-            },
-          ],
-        };
+        if (!ds.roots().length) return refuse(noComponentsMessage(ds.root, found.project?.dir));
+        const names = ds.roots().map((c) => c.name);
+        return refuse(renderNotFound(name, ds.suggestComponent(name), names));
       }
       const shown = fromRoot(ds, component, found.root);
       const description = descriptionOf(component);
-      return {
-        content: [{ type: 'text', text: nameNotice(name, component) + renderComponent(ds, shown) }],
-        structuredContent: {
-          ...shown,
-          ...(description ? { description } : {}),
-          import: importStatement(component),
-          tokens: ds.relatedTokens(component).map((t) => t.name),
-        },
-      };
+      return reply(renderComponent(ds, shown, undefined, name), {
+        ...shown,
+        ...(description ? { description } : {}),
+        import: importStatement(component),
+        tokens: ds.relatedTokens(component).map((t) => t.name),
+      });
     },
   );
 
-  server.registerTool(
+  serve.tool(
     'search_components',
     {
       title: 'Search components by intent',
@@ -588,30 +750,21 @@ export function createServer({ getDesignSystem, getProjects }: CreateServerOptio
       }),
       annotations: READ_ONLY,
     },
-    async ({ query, limit, path: target }): Promise<CallToolResult> => {
+    async ({ query, limit, path: target }) => {
       const found = await scoped(target);
       if (isResult(found)) return found;
       if ('catalog' in found) {
         const hits = found.catalog.search(query, limit);
-        return {
-          content: [{ type: 'text', text: renderCatalogSearch(query, hits) }],
-          structuredContent: {
-            results: hits.map((h) => ({ ...result(h), ...origin(h.entry) })),
-          },
-        };
+        return reply(renderCatalogSearch(query, hits), {
+          results: hits.map((h) => ({ ...result(h), ...origin(h.entry) })),
+        });
       }
-      const { ds } = found;
-      const hits = ds.search(query, limit);
-      return {
-        content: [{ type: 'text', text: renderSearch(query, hits) }],
-        structuredContent: {
-          results: hits.map(result),
-        },
-      };
+      const hits = found.ds.search(query, limit);
+      return reply(renderSearch(query, hits), { results: hits.map(result) });
     },
   );
 
-  server.registerTool(
+  serve.tool(
     'get_tokens',
     {
       title: 'Get design tokens',
@@ -629,37 +782,13 @@ export function createServer({ getDesignSystem, getProjects }: CreateServerOptio
       outputSchema: z.object({ tokens: z.array(tokenSchema) }),
       annotations: READ_ONLY,
     },
-    async ({ category, query, path: target }): Promise<CallToolResult> => {
+    async ({ category, query, path: target }) => {
       const found = await scoped(target);
       if (isResult(found)) return found;
       if ('catalog' in found) {
         const tokens = found.catalog.getTokens({ category, query });
-        return {
-          content: [
-            { type: 'text', text: renderCatalogTokens(found.catalog, tokens, { category, query }) },
-          ],
-          structuredContent: {
-            tokens: tokens.map(({ token: t, package: pkg, projects }) => ({
-              name: t.name,
-              category: t.category,
-              value: t.value,
-              ...(t.modes ? { modes: t.modes } : {}),
-              ...(t.cssVar ? { cssVar: t.cssVar } : {}),
-              ...(t.tailwind !== undefined ? { tailwind: t.tailwind } : {}),
-              usage: t.usage,
-              ...(t.description ? { description: t.description } : {}),
-              package: pkg,
-              projects,
-            })),
-          },
-        };
-      }
-      const { ds } = found;
-      const tokens = ds.getTokens({ category, query });
-      return {
-        content: [{ type: 'text', text: renderTokens(ds, tokens, { category, query }) }],
-        structuredContent: {
-          tokens: tokens.map((t) => ({
+        return reply(renderCatalogTokens(found.catalog, tokens, { category, query }), {
+          tokens: tokens.map(({ token: t, package: pkg, projects }) => ({
             name: t.name,
             category: t.category,
             value: t.value,
@@ -668,13 +797,29 @@ export function createServer({ getDesignSystem, getProjects }: CreateServerOptio
             ...(t.tailwind !== undefined ? { tailwind: t.tailwind } : {}),
             usage: t.usage,
             ...(t.description ? { description: t.description } : {}),
+            package: pkg,
+            projects,
           })),
-        },
-      };
+        });
+      }
+      const { ds } = found;
+      const tokens = ds.getTokens({ category, query });
+      return reply(renderTokens(ds, tokens, { category, query }), {
+        tokens: tokens.map((t) => ({
+          name: t.name,
+          category: t.category,
+          value: t.value,
+          ...(t.modes ? { modes: t.modes } : {}),
+          ...(t.cssVar ? { cssVar: t.cssVar } : {}),
+          ...(t.tailwind !== undefined ? { tailwind: t.tailwind } : {}),
+          usage: t.usage,
+          ...(t.description ? { description: t.description } : {}),
+        })),
+      });
     },
   );
 
-  server.registerTool(
+  serve.tool(
     'check_ui',
     {
       title: 'Check UI code against the design system',
@@ -743,8 +888,8 @@ export function createServer({ getDesignSystem, getProjects }: CreateServerOptio
       }),
       annotations: READ_ONLY,
     },
-    async ({ code, path: filePath, filename: given, limit }): Promise<CallToolResult> => {
-      if (code === undefined && !filePath) return errorResult('Pass either `code` or `path`.');
+    async ({ code, path: filePath, filename: given, limit }) => {
+      if (code === undefined && !filePath) return failure('Pass either `code` or `path`.');
       if (code !== undefined && given !== undefined && !SCRIPT_FILE.test(given)) {
         return notScript(
           given,
@@ -778,13 +923,14 @@ export function createServer({ getDesignSystem, getProjects }: CreateServerOptio
       } else if (routeBy) {
         const found = await scoped(routeBy);
         if (isResult(found)) return found;
-        if (!('ds' in found)) return errorResult(`Cannot find the project of ${routeBy}.`);
+        if (!('ds' in found)) return failure(`Cannot find the project of ${routeBy}.`);
         ds = found.ds;
       } else if (set.dirs.length <= 1) {
         ds = (await set.forPath(set.dirs[0] ?? '.')).ds;
       } else {
-        return errorResult(
-          `This is a monorepo root with ${set.dirs.length} projects (${listOf(set.dirs, 6)}). Pass \`filename\`, the path the code will be saved under relative to the root, so the right project's design system checks it.`,
+        const dirs = set.dirs.map(pathOf);
+        return failure(
+          `This is a monorepo root with ${set.dirs.length} projects (${listOf(dirs, 6)}). Pass \`filename\`, the path the code will be saved under relative to the root, so the right project's design system checks it.`,
         );
       }
       // Paths are relative to the root the client knows: the workspace root, when served from there.
@@ -798,9 +944,9 @@ export function createServer({ getDesignSystem, getProjects }: CreateServerOptio
         if (set || isInside(ds.root, absolute)) file = relativePath(ds.root, absolute);
       }
       if (source === undefined) {
-        if (!filePath) return errorResult('Pass either `code` or `path`.');
+        if (!filePath) return failure('Pass either `code` or `path`.');
         const absolute = path.resolve(base, filePath);
-        const outside = errorResult(`${filePath} is outside the project root (${base}).`);
+        const outside = failure(`${filePath} is outside the project root (${base}).`);
         if (!isInside(base, absolute)) return outside;
         if (!SCRIPT_FILE.test(absolute)) return notScript(filePath);
         try {
@@ -808,20 +954,17 @@ export function createServer({ getDesignSystem, getProjects }: CreateServerOptio
           const [root, real] = await Promise.all([fs.realpath(base), fs.realpath(absolute)]);
           if (!isInside(root, real)) return outside;
           if ((await fs.stat(real)).size > MAX_CODE) {
-            return {
-              isError: true,
-              content: [{ type: 'text', text: `${filePath} is too large to check.` }],
-            };
+            return failure(`${filePath} is too large to check.`);
           }
           source = await fs.readFile(real, 'utf8');
         } catch {
-          return { isError: true, content: [{ type: 'text', text: `Cannot read ${filePath}.` }] };
+          return failure(`Cannot read ${filePath}.`);
         }
         file = relativePath(ds.root, absolute);
         shown = relativePath(base, absolute);
       }
-      // A file the config's `exclude` covers is left out, as `check .`, the ESLint plugin and the
-      // hook leave it out. Code without a filename is checked.
+      // A file the config's `exclude` covers is left out, as `check .`, the ESLint plugin and
+      // the hook leave it out. Code without a filename is checked.
       const excluded =
         (filename !== undefined || code === undefined) && !path.isAbsolute(file)
           ? excludedBy(ds.config, file)
@@ -832,37 +975,34 @@ export function createServer({ getDesignSystem, getProjects }: CreateServerOptio
             diagnostics: [],
             errorCount: 0,
             warningCount: 0,
-            skipped: `It is left out by "${excluded}" in the config's exclude, as in check, the ESLint plugin and the Claude Code hook.`,
+            skipped: `It is left out by ${json(excluded)} in the config's exclude, as in check, the ESLint plugin and the Claude Code hook.`,
           }
         : ds.check(source, file);
       const result = file === shown ? checked : { ...checked, file: shown };
       const capped = capDiagnostics(result, limit);
       // A clean result without components or color tokens, with components the model leaves
       // out, or with what was not read (a library, the dependencies), says little.
-      const notice = result.skipped
-        ? undefined
-        : [ds.notice(), ...notReadNotices([{ ds }]), uncheckedNotice([result])]
-            .filter(Boolean)
-            .join('\n\n') || undefined;
-      return {
-        content: [
-          { type: 'text', text: renderCheck(result, capped) + (notice ? `\n\n${notice}` : '') },
-        ],
-        structuredContent: {
-          ...result,
-          diagnostics: capped.shown,
-          omitted: capped.omitted,
-          byRule: capped.byRule,
-          ok: result.errorCount === 0,
-          ...(notice ? { notice } : {}),
-        },
-      };
+      const notices = result.skipped
+        ? []
+        : [ds.notice(), ...notReadNotices([{ ds }]), uncheckedNotice([result])].filter(
+            (notice): notice is string => Boolean(notice),
+          );
+      const notice = notices.join('\n\n') || undefined;
+      return reply(renderCheck(result, capped, notices), {
+        ...result,
+        diagnostics: capped.shown,
+        omitted: capped.omitted,
+        byRule: capped.byRule,
+        ok: result.errorCount === 0,
+        ...(notice ? { notice } : {}),
+      });
     },
   );
 
-  server.registerResource(
+  serve.template(
     'component',
-    new ResourceTemplate('ds://components/{name}', {
+    {
+      uri: 'ds://components/{name}',
       list: async () => {
         const found = await listed();
         if (!found) return { resources: [] };
@@ -873,7 +1013,7 @@ export function createServer({ getDesignSystem, getProjects }: CreateServerOptio
               uri: `ds://components/${c.name}${ambiguous ? `?path=${encodeURIComponent(projects[0] ?? '.')}` : ''}`,
               name: c.name,
               title: c.name,
-              ...resourceDescription(c),
+              ...describedAs(c),
               mimeType: 'text/markdown',
             })),
           };
@@ -883,7 +1023,7 @@ export function createServer({ getDesignSystem, getProjects }: CreateServerOptio
             uri: `ds://components/${c.name}`,
             name: c.name,
             title: c.name,
-            ...resourceDescription(c),
+            ...describedAs(c),
             mimeType: 'text/markdown',
           })),
         };
@@ -900,7 +1040,7 @@ export function createServer({ getDesignSystem, getProjects }: CreateServerOptio
           return [...new Set(names)].filter((n) => n.toLowerCase().startsWith(lower));
         },
       },
-    }),
+    },
     {
       title: 'Design-system component',
       description: 'Props, variants, parts, tokens, guidelines and examples for one component.',
@@ -913,27 +1053,20 @@ export function createServer({ getDesignSystem, getProjects }: CreateServerOptio
       if ('catalog' in found) {
         const matches = found.catalog.find(wanted);
         const [entry] = matches;
-        if (!entry) throw new Error(`No component named "${wanted}".`);
-        if (matches.length > 1) throw new Error(renderAmbiguous(wanted, matches));
-        return {
-          contents: [
-            {
-              uri: uri.href,
-              mimeType: 'text/markdown',
-              text: renderComponent(entry.ds, entry.component, entry),
-            },
-          ],
-        };
+        if (!entry) throw new AnswerError(answer([`No component named ${json(wanted)}.`]));
+        if (matches.length > 1) throw new AnswerError(renderAmbiguous(wanted, matches));
+        const text = renderComponent(entry.ds, entry.component, entry);
+        return contents(uri, 'text/markdown', text);
       }
       const { ds } = found;
       const component = ds.getComponent(wanted);
-      if (!component) throw new Error(`No component named "${wanted}".`);
+      if (!component) throw new AnswerError(answer([`No component named ${json(wanted)}.`]));
       const text = renderComponent(ds, fromRoot(ds, component, found.root));
-      return { contents: [{ uri: uri.href, mimeType: 'text/markdown', text }] };
+      return contents(uri, 'text/markdown', text);
     },
   );
 
-  server.registerResource(
+  serve.resource(
     'tokens',
     'ds://tokens',
     {
@@ -949,19 +1082,14 @@ export function createServer({ getDesignSystem, getProjects }: CreateServerOptio
               .getTokens()
               .map(({ token, package: pkg, projects }) => ({ ...token, package: pkg, projects }))
           : found.ds.getTokens();
-      return {
-        contents: [
-          {
-            uri: uri.href,
-            mimeType: 'application/json',
-            text: JSON.stringify(tokens, null, 2),
-          },
-        ],
-      };
+      // JSON escapes every line break in a string but U+0085, U+2028 and U+2029, which
+      // `answer` escapes as JSON does (`\u2028`), so the JSON stays valid.
+      const text = answer(JSON.stringify(tokens, null, 2).split('\n'));
+      return contents(uri, 'application/json', text);
     },
   );
 
-  server.registerPrompt(
+  serve.prompt(
     'build-with-design-system',
     {
       title: 'Build UI with the design system',
@@ -982,43 +1110,13 @@ export function createServer({ getDesignSystem, getProjects }: CreateServerOptio
           : found.ds.roots();
       const allTokens =
         'catalog' in found ? found.catalog.getTokens().map((t) => t.token) : found.ds.tokens;
-      const components = roots
-        .map((c) => {
-          const extras = [
-            ...c.variants.map((v) => v.name),
-            ...(c.subcomponents.length ? [`+${c.subcomponents.length} parts`] : []),
-          ];
-          return `${c.name}${extras.length ? ` (${extras.join(', ')})` : ''}`;
-        })
-        .join(', ');
-      const counts = new Map<string, number>();
-      for (const token of allTokens)
-        counts.set(token.category, (counts.get(token.category) ?? 0) + 1);
-      const tokens = [...counts].map(([category, n]) => `${n} ${category}`).join(', ');
-      return {
-        description: 'Build UI with the design system',
-        messages: [
-          {
-            role: 'user',
-            content: {
-              type: 'text',
-              text: `Build this UI with the project's design system: ${task}
-
-Work like this:
-1. Find components: search_components for each piece of the UI (for example "confirm a destructive action"), or list_components for an overview.
-2. Read the contract: get_component for every component you use. Use only the props and variant values it lists, and compose its parts as its docs and examples show, when it has them.
-3. Style with tokens: get_tokens when you need a color, spacing or radius. Never write hex/rgb colors, arbitrary px values or Tailwind default palette classes such as bg-blue-500. chart-* and sidebar-* tokens are for charts and the sidebar only: for a status color the theme has no token for (success, warning, info), add a token or keep the Tailwind color as check_ui says, and never use a chart-* or sidebar-* token for it.
-4. Use design-system components instead of native elements (<Button>, not <button>).
-5. Verify: run check_ui on the code you wrote, fix every error, and run it again until it reports none.
-
-Design system: ${components || 'no components found'}.
-Tokens: ${tokens || 'none'}.${'catalog' in found ? `\n\nThis is a monorepo root with ${found.set.dirs.length} projects (${found.set.dirs.join(', ')}): pass \`path\` with the file you are writing to get_component, get_tokens and check_ui, so they answer for its project.` : ''}`,
-            },
-          },
-        ],
-      };
+      const text = renderPrompt(
+        task,
+        roots,
+        allTokens,
+        'catalog' in found ? found.set.dirs : undefined,
+      );
+      return prompted('Build UI with the design system', text);
     },
   );
-
-  return server;
 }

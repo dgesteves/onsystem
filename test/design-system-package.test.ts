@@ -385,7 +385,7 @@ describe('a config a design-system package declares', () => {
     const missing = await error(withField('./onsystem.config.json'));
     expect(missing.name).toBe('ConfigError');
     expect(missing.message).toMatch(
-      /^@acme\/kit: "onsystem" in .*package\.json names \.\/onsystem\.config\.json, which does not exist\.\nFix the "onsystem" field in that package, or give .* a config of its own \(onsystem\.config\.json\), which is read instead\.$/,
+      /^"@acme\/kit": "onsystem" in .*package\.json names "\.\/onsystem\.config\.json", which does not exist\.\nFix the "onsystem" field in that package, or give .* a config of its own \(onsystem\.config\.json\), which is read instead\.$/,
     );
     const code = await error(
       withField('./onsystem.config.mjs', {
@@ -399,7 +399,7 @@ describe('a config a design-system package declares', () => {
       withField('../../onsystem.config.json', { 'onsystem.config.json': json({}) }),
     );
     expect(outside.message).toContain(
-      'names ../../onsystem.config.json, which is outside the package.',
+      'names "../../onsystem.config.json", which is outside the package.',
     );
   });
 
@@ -427,7 +427,7 @@ describe('a config a design-system package declares', () => {
     expect(config.designSystemPackage).toBeUndefined();
     expect(config.components).toEqual(DEFAULT_COMPONENTS);
     expect(config.warnings).toEqual([
-      `@acme/kit's onsystem config was skipped: "onsystem" in ${path.join(root, 'node_modules/@acme/kit/package.json')} names ./onsystem.config.json, which does not exist. @acme/kit is installed in node_modules, so this project is read as if it declared none.`,
+      `@acme/kit's onsystem config was skipped: "onsystem" in ${path.join(root, 'node_modules/@acme/kit/package.json')} names "./onsystem.config.json", which does not exist. @acme/kit is installed in node_modules, so this project is read as if it declared none.`,
       `left-pad's onsystem config was skipped: "onsystem" in ${path.join(root, 'node_modules/left-pad/package.json')} is {"other":"use"}: it names a JSON config file in the package, such as "./onsystem.config.json". left-pad is installed in node_modules, so this project is read as if it declared none.`,
     ]);
 
@@ -469,7 +469,7 @@ describe('a config a design-system package declares', () => {
       'packages/kit/package.json': json({ name: '@acme/kit', onsystem: './onsystem.config.json' }),
     });
     await expect(loadConfig({ root: path.join(workspace, 'apps/web') })).rejects.toThrow(
-      /^@acme\/kit: "onsystem" in .*package\.json names \.\/onsystem\.config\.json, which does not exist\./,
+      /^"@acme\/kit": "onsystem" in .*package\.json names "\.\/onsystem\.config\.json", which does not exist\./,
     );
   });
 

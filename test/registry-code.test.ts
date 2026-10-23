@@ -177,7 +177,7 @@ describe('code from shadcn registries (docs/configuration.md)', () => {
     // Agents find the registry's components.
     expect(await tool(root, 'get_component', { name: 'DiffReview' })).toMatch(/^# DiffReview\n/);
     expect(await tool(root, 'search_components', { query: 'review file changes' })).toMatch(
-      /best first:\n\n1\. DiffReview/,
+      /best first:\nText after >, .+\n\n1\. DiffReview/,
     );
     // Helpers count too: the folder's Img stands in for a native <img>.
     expect(all.messages).toContain(

@@ -36,6 +36,9 @@ export interface LibraryExtraction {
   dependencies: string[];
 }
 
+/** A component's name: a capitalised identifier (`Button`, `ButtonBase`, `Unstable_Grid2`). */
+const COMPONENT_NAME = /^[A-Z][\w$]*$/;
+
 /** Packages contributing more props than this are summarised, as in source extraction. */
 const MAX_LISTED_INHERITED = 40;
 
@@ -133,9 +136,12 @@ export function extractLibrary(options: ExtractLibraryOptions): LibraryExtractio
         isDefault && subpath && declaration
           ? (ts.getNameOfDeclaration(declaration)?.getText() ?? 'default')
           : exported.getName();
-      if (isDefault && !/^[A-Z]/.test(name)) continue;
+      if (isDefault && !COMPONENT_NAME.test(name)) continue;
       exportNames.add(name);
-      if (!/^[A-Z]/.test(name)) continue;
+      // A component's name is a capitalised identifier, as JSX writes it. An export under a string
+      // name (`export { Other as "Any text" }`, ES2022) can hold any text, a line break too: no
+      // component, since JSX cannot name it, and its name would start lines of the answers.
+      if (!COMPONENT_NAME.test(name)) continue;
       const known = bySymbol.get(symbol);
       if (known) {
         if (known.name !== name && !known.aliases.includes(name)) known.aliases.push(name);

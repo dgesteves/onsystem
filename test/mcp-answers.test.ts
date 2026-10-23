@@ -308,7 +308,8 @@ describe('search_components when nothing clearly matches (the demo)', () => {
     const found = await search(query);
     expect(found.text).toMatch(
       new RegExp(
-        `^No component clearly matches "${query}"\\. The nearest have only a word or two in common with it:\\n\\n1\\. ${nearest}`,
+        // The demo's descriptions are its JSDoc: quoted, under the line that says so.
+        `^No component clearly matches "${query}"\\. The nearest have only a word or two in common with it:\\nText after >, .+\\n\\n1\\. ${nearest} `,
       ),
     );
     expect(found.text).toContain('the design system may have no component for this: ask');
@@ -319,7 +320,9 @@ describe('search_components when nothing clearly matches (the demo)', () => {
 
   it('keeps clear matches, best first, and leaves out the ones with a word in common', async () => {
     const modal = await search('modal window');
-    expect(modal.text).toMatch(/^Components for "modal window", best first:\n\n1\. Dialog —/);
+    expect(modal.text).toMatch(
+      /^Components for "modal window", best first:\nText after >, .+\n\n1\. Dialog — "/,
+    );
     expect(modal.results.map((r) => r.name)).toEqual(['Dialog']);
     expect(modal.results[0]).not.toHaveProperty('weak');
 
@@ -488,10 +491,10 @@ export function Picker(props: PickerProps) {
     const client = await serve(ds);
     const result = await client.callTool({ name: 'get_component', arguments: { name: 'Picker' } });
     expect(text(result)).toContain(
-      '- actionsRef?: { current: unknown; } — A ref to imperative actions.\n',
+      '- actionsRef?: { current: unknown; } — "A ref to imperative actions."\n',
     );
     expect(text(result)).not.toContain('Useful when');
-    expect(text(result)).toContain('— Visual style. Use `subtle` inside cards.');
+    expect(text(result)).toContain('— "Visual style. Use `subtle` inside cards."');
     const { props } = result.structuredContent as {
       props: { name: string; description: string }[];
     };

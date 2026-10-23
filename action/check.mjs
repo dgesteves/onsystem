@@ -460,7 +460,7 @@ function summary(headline, reported) {
     .slice(0, 200)
     .map(
       (f) =>
-        `| ${f.severity} | \`${cell(f.file)}:${f.line}\` | \`${f.ruleId}\` | ${cell(f.message)} |`,
+        `| ${f.severity} | ${codeCell(`${f.file}:${f.line}`)} | \`${f.ruleId}\` | ${cell(f.message)} |`,
     );
   const table = rows.length
     ? ['', '| | Where | Rule | Finding |', '| --- | --- | --- | --- |', ...rows]
@@ -468,4 +468,20 @@ function summary(headline, reported) {
   const more =
     reported.length > rows.length ? ['', `…and ${reported.length - rows.length} more.`] : [];
   return `${['### onsystem', '', headline, ...table, ...more].join('\n')}\n`;
+}
+
+/**
+ * A table cell of code: a file name from the pull request, which can hold backticks, Markdown and
+ * HTML. The span is fenced with more backticks than the text has in a row, so none ends it, and
+ * within it nothing else is read but the table's escapes: `\|` for a `|`, and `\\` for a
+ * backslash, so a name's own backslash cannot take a `|` out of the cell (it shows doubled).
+ *
+ * @param {string} text
+ */
+function codeCell(text) {
+  const runs = text.match(/`+/g) ?? [];
+  const fence = '`'.repeat(Math.max(0, ...runs.map((run) => run.length)) + 1);
+  const pad = runs.length ? ' ' : '';
+  const escaped = text.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
+  return `${fence}${pad}${escaped}${pad}${fence}`;
 }

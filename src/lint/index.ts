@@ -186,7 +186,8 @@ export function uncheckedNotice(results: readonly CheckResult[]): string | undef
   const list = [...names];
   const shown = list.slice(0, 4).map((n) => `<${n}>`);
   const more = list.length > shown.length ? ` and ${list.length - shown.length} more` : '';
-  const from = [...modules].slice(0, 3).map((m) => `"${m}"`);
+  // JSON-quoted: a module specifier is the checked file's, and can hold a quote or a line break.
+  const from = [...modules].slice(0, 3).map((m) => JSON.stringify(m));
   const moreModules = modules.size > from.length ? ` and ${modules.size - from.length} more` : '';
   const where = results.length > 1 ? ` (in ${files} ${files === 1 ? 'file' : 'files'})` : '';
   return (

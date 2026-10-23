@@ -1439,9 +1439,11 @@ export function declaredConfig(
   }
   const file = path.resolve(dir, value);
   if (!isInside(dir, file) || file === path.resolve(dir)) {
-    return { problem: `${field} names ${value}, which is outside the package.` };
+    return { problem: `${field} names ${JSON.stringify(value)}, which is outside the package.` };
   }
-  if (!isFile(file)) return { problem: `${field} names ${value}, which does not exist.` };
+  if (!isFile(file)) {
+    return { problem: `${field} names ${JSON.stringify(value)}, which does not exist.` };
+  }
   return { file };
 }
 

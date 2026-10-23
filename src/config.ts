@@ -56,7 +56,7 @@ function unknownKeys(what: string, known: readonly string[]) {
     return issue.keys
       .map((key) => {
         const guess = closest(key, known, 0.5);
-        return `Unknown ${what} "${key}". ${guess ? `Did you mean "${guess}"?` : `Expected one of: ${known.join(', ')}.`}`;
+        return `Unknown ${what} ${JSON.stringify(key)}. ${guess ? `Did you mean "${guess}"?` : `Expected one of: ${known.join(', ')}.`}`;
       })
       .join('\n');
   };
@@ -81,7 +81,7 @@ const ruleSettingSchema = z.union(
       if (typeof issue.input !== 'string') return undefined;
       const input = issue.input;
       const guess = SEVERITIES.find((s) => input && (s.startsWith(input) || input.startsWith(s)));
-      return `Invalid severity "${input}": use "off", "warn" or "error"${guess ? ` (did you mean "${guess}"?)` : ''}.`;
+      return `Invalid severity ${JSON.stringify(input)}: use "off", "warn" or "error"${guess ? ` (did you mean "${guess}"?)` : ''}.`;
     },
   },
 );
@@ -122,7 +122,7 @@ const librariesSchema = z.union([z.literal(false), z.array(z.enum(LIBRARY_IDS))]
       : undefined;
     if (typeof unknown === 'string') {
       const guess = closest(unknown, LIBRARY_IDS, 0.5);
-      return `Unknown library "${unknown}". ${guess ? `Did you mean "${guess}"?` : `Expected one of: ${LIBRARY_IDS.join(', ')}.`}`;
+      return `Unknown library ${JSON.stringify(unknown)}. ${guess ? `Did you mean "${guess}"?` : `Expected one of: ${LIBRARY_IDS.join(', ')}.`}`;
     }
     return `"libraries" is false, to read no library, or a list of the ones to read: ${JSON.stringify(LIBRARY_IDS)}.`;
   },
@@ -671,7 +671,7 @@ function ownDeclaredConfig(dir: string): string | undefined {
 /** The error for workspace packages whose declaration cannot be read: their team can fix them. */
 function declarationError(lookup: DesignSystemPackageLookup, dir: string): ConfigError {
   return new ConfigError(
-    `${lookup.problems.map((p) => `${p.name}: ${p.problem}`).join('\n')}\nFix the "${PACKAGE_FIELD}" field in that package, or give ${dir} a config of its own (onsystem.config.json), which is read instead.`,
+    `${lookup.problems.map((p) => `${JSON.stringify(p.name)}: ${p.problem}`).join('\n')}\nFix the "${PACKAGE_FIELD}" field in that package, or give ${dir} a config of its own (onsystem.config.json), which is read instead.`,
   );
 }
 

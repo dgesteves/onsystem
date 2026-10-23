@@ -77,7 +77,9 @@ describe('MCP server over the in-memory transport', () => {
 
   it('list_components', async () => {
     const result = await client.callTool({ name: 'list_components', arguments: {} });
-    expect(text(result)).toContain('Button <button> — Triggers an action or event');
+    // The demo's description is its JSDoc: quoted, under the line that says so.
+    expect(text(result)).toMatch(/^5 components \(\+\d+ parts\)\. .+\nText after >, /);
+    expect(text(result)).toContain('Button <button> — "Triggers an action or event');
     expect(text(result)).toContain(
       'variant: default | destructive | outline | secondary | ghost | link (default default)',
     );
@@ -95,7 +97,7 @@ describe('MCP server over the in-memory transport', () => {
     const result = await client.callTool({ name: 'get_component', arguments: { name: 'button' } });
     const body = text(result);
     expect(body).toContain('import { Button } from "@/components/ui/button"');
-    expect(body).toContain('- asChild?: boolean = false — Render the child element');
+    expect(body).toContain('- asChild?: boolean = false — "Render the child element');
     expect(body).toMatch(
       /…plus \d+ props from React\.ComponentProps<"button"> \(onClick, type, disabled, form, aria-\*/,
     );
@@ -104,7 +106,7 @@ describe('MCP server over the in-memory transport', () => {
     );
     expect(body).toContain('## Variants');
     expect(body).toContain('## Docs (docs/button.md)');
-    expect(body).toContain('### Destructive action');
+    expect(body).toContain('### "Destructive action"');
     expect(result.structuredContent).toMatchObject({ name: 'Button', element: 'button' });
 
     const part = await client.callTool({
@@ -146,7 +148,7 @@ describe('MCP server over the in-memory transport', () => {
       arguments: { query: 'confirm a destructive action', limit: 3 },
     });
     expect(text(result)).toMatch(
-      /^Components for "confirm a destructive action", best first:\n\n1\. Dialog/,
+      /^Components for "confirm a destructive action", best first:\nText after >, .+\n\n1\. Dialog — "/,
     );
     const { results } = result.structuredContent as { results: { name: string }[] };
     expect(results[0]?.name).toBe('Dialog');
