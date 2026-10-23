@@ -77,7 +77,7 @@ npx -y onsystem check .   # the same check the agent and CI run
 npx -y onsystem init      # write the config, and offer a baseline
 ```
 
-At a [monorepo root](https://onsystem.vercel.app/docs/configuration#monorepo-roots), `inspect` lists every app and design-system package, and `check` checks each file by its own project's design system. In a [design-system package](https://onsystem.vercel.app/docs/design-system-packages), `init` sets it up for every app that depends on it, with no config in the apps: as a workspace package, or installed from npm when it publishes its component sources (`init` checks its `files` list). From a package that publishes only compiled code, installed apps get the token rules but no component, prop, variant or native-element checks.
+At a [monorepo root](https://onsystem.vercel.app/docs/configuration#monorepo-roots), `inspect` lists every app and design-system package, and `check` checks each file by its own project's design system. In a [design-system package](https://onsystem.vercel.app/docs/design-system-packages), `init` sets it up for every app that depends on it, with no config in the apps: as a workspace package, or installed from npm. Installed apps read the components from the sources the package publishes, or from its type declarations (`.d.ts`) when it publishes only compiled `dist/`, and get every rule either way (`init` checks its `files` list). From a package that publishes compiled code and no type declarations, they get the token rules but no component, prop, variant or native-element checks.
 
 In a new create-next-app, the template page's hardcoded colors already make the first `check .` fail; `init` offers to record them as a baseline, so only new findings fail. Folders installed from a shadcn registry, such as `components/ai-elements`, are someone else's code: [Code from shadcn registries](https://onsystem.vercel.app/docs/configuration#code-from-shadcn-registries) says how to check them or leave them out.
 
@@ -135,6 +135,21 @@ steps:
 [Benchmark v2](bench/v2) gave 6 models from 3 providers (Anthropic, OpenAI and Google) 20 single-file UI tasks in 5 open-source repositories, without onsystem, with its skill, MCP server or hook, and with all three: 1,200 runs, 240 per arm. Counted by onsystem 0.5.0's own check, design-system errors per run went from 0.85 without onsystem to 0.00 with all three, with no measurable change in the `tsc` pass rate (93% → 92%).
 
 That count is onsystem's own, and the MCP server and the hook show the agent the same errors to fix. In tasks that ask for a green status label in a design system with no success token, agents with onsystem often used `chart-*` tokens, which it counts as clean. The blind labels by an AI reviewer, 12 files per arm, are too few to confirm the count either way, and every violation they found with the hook or all three is a palette color in Dub, whose tokens 0.5.0 did not read. The [benchmark page](https://onsystem.vercel.app/benchmark) has every table, and [bench/v2](bench/v2) the method, the per-run data and every generated file.
+
+## Compatibility
+
+What `package.json` declares and CI runs:
+
+| With             | Supported                                                                                                                                                                                              |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Node.js          | Node.js 20.19 or later (`engines`). CI runs the tests on Node.js 22, 24 and 26, and the built package on 20.19                                                                                         |
+| Operating system | Linux, macOS and Windows: CI runs the tests and the pack test on each                                                                                                                                  |
+| ESLint           | ESLint 8.57, 9 and 10, for the ESLint plugin only: `eslint` is an optional peer, and the CLI, the MCP server, the hook and the Action do not need it                                                   |
+| TypeScript       | Your project's TypeScript is not used, and a JavaScript project needs none: onsystem reads `.tsx` and `.jsx` with its own TypeScript 6.0, a dependency, not a peer                                     |
+| React            | Components written for React 18 (`forwardRef`) or React 19 (`ref` as a prop), read from source or type declarations. onsystem does not depend on React                                                 |
+| Tailwind CSS     | v4 (`@theme`) and v3 (`tailwind.config`, read without running it). Without Tailwind, tokens come from CSS custom properties, DTCG files or a DESIGN.md                                                 |
+| shadcn/ui        | Both bases, Radix (`asChild`) and Base UI (`render`), on Tailwind v3 or v4, with no config                                                                                                             |
+| MCP clients      | Any client that starts a stdio server; CI connects on the 2025-11-25 and 2026-07-28 protocols. [Set up your agent](https://onsystem.vercel.app/docs/clients) has each client's config and support tier |
 
 ## Docs
 

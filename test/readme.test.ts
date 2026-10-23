@@ -73,13 +73,19 @@ describe('the README', () => {
     );
   });
 
-  it('says what apps that install a design-system package miss when it publishes only compiled code', () => {
+  it('says what apps that install a design-system package get from compiled code, with and without type declarations', () => {
     const quickstart = section('## Quickstart').replace(/\s+/g, ' ');
-    // In the words init uses to tell the package's team (src/init.ts).
+    // Every rule runs from the `.d.ts` of a package set up with init
+    // (test/installed-declarations.test.ts).
+    expect(quickstart).toContain(
+      'or from its type declarations (`.d.ts`) when it publishes only compiled `dist/`, and get every rule either way',
+    );
+    // Without them, the token rules, in the words init uses to tell the package's team
+    // (src/init.ts).
     const missed = 'no component, prop, variant or native-element checks';
     expect(read('src/init.ts')).toContain(missed);
     expect(quickstart).toContain(
-      `From a package that publishes only compiled code, installed apps get the token rules but ${missed}.`,
+      `From a package that publishes compiled code and no type declarations, they get the token rules but ${missed}.`,
     );
   });
 
