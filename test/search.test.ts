@@ -1,3 +1,4 @@
+import { stemmer } from 'stemmer';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import type { DesignSystem } from '../src/design-system.js';
@@ -20,6 +21,23 @@ describe('tokenize', () => {
     expect(query.get('modal')).toBe(1);
     expect(query.get('dialog')).toBe(0.5);
     expect(query.get('destruct')).toBe(0.5);
+  });
+
+  it.each([
+    ['a slideover from the right', 'sheet'],
+    ['an expandable faq', 'accordion'],
+    ['a multiline note', 'textarea'],
+    ['a range input', 'slider'],
+    ['a date field', 'calendar'],
+    ['open the palette', 'command'],
+    ['the signed-in user profile with initials', 'avatar'],
+  ])('"%s" reaches %s through a synonym', (query, name) => {
+    expect(expandQuery(query).get(name)).toBe(0.5);
+  });
+
+  // Each of these is a component of its own, so it stays a term, not a synonym.
+  it.each(['avatar', 'drawer', 'collapsible', 'sidebar'])('"%s" expands to itself only', (word) => {
+    expect([...expandQuery(word)]).toEqual([[stemmer(word), 1]]);
   });
 });
 
