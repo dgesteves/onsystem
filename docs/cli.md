@@ -74,7 +74,7 @@ It exits with:
 | Option              | What it does                                                                                                                                                              |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--explain`         | Adds every candidate zero config looked at and why it was taken or not, the config it resolved to, the tokens that did not resolve and the components whose props did not |
-| `--format <format>` | `json` prints what it read as JSON, for scripts                                                                                                                           |
+| `--format <format>` | `pretty` (the default) or `json`, which prints what it read as JSON, for scripts; another value exits 2                                                                   |
 
 ## `export`
 

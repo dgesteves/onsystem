@@ -76,15 +76,16 @@ with a config, components.json or package.json, and inspect lists every project.
 
 Options
   --root <dir>            Project root (default: the config file's directory, or cwd)
-  --config <file>         Config file (default: onsystem.config.{json,ts,mjs,js})
+  --config <file>         Config file (default: onsystem.config.{json,ts,mts,js,mjs})
   --components <glob>     Component sources, repeatable (default: found through
                           components.json or a workspace package, else
                           components/ui/**/*.{tsx,jsx} and src/components/ui/...)
-  --tokens <file>         Token file (DTCG .json or CSS), repeatable
+  --tokens <file>         Token file (DTCG .json, CSS or DESIGN.md), repeatable
   --docs <glob>           Component docs (Markdown/MDX), repeatable
   --no-cache              Ignore the on-disk extraction cache
   --no-watch              serve: do not reload when files change
   --format <format>       check: pretty | json | github | sarif (default: pretty);
+                          inspect: pretty | json (default: pretty);
                           export: dtcg | design-md
   --out <file>            export: write to this file instead of stdout
   --max-warnings <n>      check: exit 1 when there are more than n warnings
@@ -1114,6 +1115,11 @@ async function inspect(
   values: { cache: boolean; format?: string | undefined; explain: boolean },
   io: Io,
 ): Promise<number> {
+  const format = values.format ?? 'pretty';
+  if (!['pretty', 'json'].includes(format)) {
+    io.stderr(`inspect: unknown --format "${format}" (pretty, json)`);
+    return 2;
+  }
   const target = await loadTarget(configOptions);
   const { config } = target;
   warnDeprecated(config.deprecations, 'pretty', io);

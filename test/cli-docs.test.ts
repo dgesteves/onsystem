@@ -25,12 +25,6 @@ const read = (file: string) =>
 const COMMANDS = ['serve', 'check', 'inspect', 'export', 'init'] as const;
 /** The section of docs/cli.md for options that do not name a command in `--help`. */
 const SHARED = 'Options for every command';
-/**
- * Options the CLI takes for a command whose `--help` text does not name it: `inspect --format
- * json`. The test below runs each one, so the row stays true.
- */
-const BEYOND_HELP: Record<string, string[]> = { '`inspect`': ['--format'] };
-
 interface Option {
   /** The flags, such as `-y` and `--yes`. */
   flags: string[];
@@ -166,6 +160,7 @@ describe('the CLI reference (docs/cli.md)', () => {
     });
     expect(options.find((o) => o.flags.includes('--format'))?.commands).toEqual([
       'check',
+      'inspect',
       'export',
     ]);
   });
@@ -208,19 +203,20 @@ describe('the CLI reference (docs/cli.md)', () => {
         const expected = option?.commands.length
           ? option.commands.map((c) => `\`${c}\``)
           : [SHARED];
-        if (row.flags.some((flag) => BEYOND_HELP[heading]?.includes(flag))) continue;
         expect(expected, `${row.flags.join(', ')} under "${heading}"`).toContain(heading);
       }
     }
   });
 
-  it('runs inspect --format json, which --help does not list', async () => {
+  it('runs inspect --format json, the value its row names', async () => {
     const out: string[] = [];
     const io: Io = { cwd: DEMO_ROOT, color: false, stdout: (t) => out.push(t), stderr: () => {} };
     expect(await main(['inspect', '--format', 'json', '--no-cache'], io)).toBe(0);
     const model = JSON.parse(out.join('\n')) as { components: { name: string }[] };
     expect(model.components.map((c) => c.name)).toContain('Button');
-    expect(section(cli, '`inspect`')).toMatch(/^\| `--format <format>` +\| `json` /m);
+    expect(section(cli, '`inspect`')).toMatch(
+      /^\| `--format <format>` +\| `pretty` \(the default\) or `json`/m,
+    );
   });
 
   it('names every config file name the CLI looks for, as docs/configuration.md does', () => {

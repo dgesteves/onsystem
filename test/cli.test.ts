@@ -7,6 +7,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { describe, expect, it } from 'vitest';
 
 import { main, type Io } from '../src/cli.js';
+import { CONFIG_FILES } from '../src/config.js';
 import { VERSION } from '../src/version.js';
 import { DEMO_ROOT, fixture } from './helpers.js';
 
@@ -169,6 +170,7 @@ describe('onsystem check', () => {
     expect((await run(['check'])).code).toBe(2);
     expect((await run(['check', 'nope/**/*.tsx'])).stderr).toContain('no files match');
     expect((await run(['check', 'x.tsx', '--format', 'xml'])).code).toBe(2);
+    expect((await run(['inspect', '--format', 'xml'])).code).toBe(2);
     expect((await run(['frobnicate'])).code).toBe(2);
     expect((await run(['--bogus'])).code).toBe(2);
   });
@@ -868,6 +870,27 @@ describe('onsystem inspect, --help, --version', () => {
   it('prints help and version', async () => {
     expect((await run(['--help'])).stdout).toContain('onsystem check <paths...>');
     expect((await run(['-v'])).stdout).toBe(VERSION);
+  });
+
+  it('names every config file extension in --help', async () => {
+    const { stdout } = await run(['--help']);
+    const listed = /onsystem\.config\.\{([^}]+)\}/.exec(stdout)?.[1]?.split(',');
+    const extensions = CONFIG_FILES.map((name) => name.slice('onsystem.config.'.length));
+    expect([...(listed ?? [])].sort()).toEqual([...extensions].sort());
+  });
+
+  it('rejects an unknown --format, in a project and at a monorepo root', async () => {
+    const monorepo = fixture({
+      'pnpm-workspace.yaml': 'packages:\n  - apps/*\n',
+      'package.json': '{ "name": "acme", "private": true }',
+    });
+    appIn(monorepo);
+    for (const cwd of [DEMO_ROOT, monorepo]) {
+      const { code, stdout, stderr } = await run(['inspect', '--format', 'xml', '--no-cache'], cwd);
+      expect(code).toBe(2);
+      expect(stderr).toBe('inspect: unknown --format "xml" (pretty, json)');
+      expect(stdout).toBe('');
+    }
   });
 });
 
