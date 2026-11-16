@@ -125,7 +125,7 @@
     "prettier": "^3.9.10",
     "publint": "^0.3.25",
     "react-aria-components": "^1.22.1",
-    "tailwind-variants": "^3.3.1",
+    "tailwind-variants": "^4.0.2",
     "tsdown": "^0.23.1",
     "typescript-eslint": "^8.71.2",
     "vitest": "^5.0.5"
