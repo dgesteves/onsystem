@@ -3,17 +3,6 @@ packages:
   - examples/*
   - site
 minimumReleaseAgeExclude:
-  - '@typescript-eslint/eslint-plugin@8.71.1'
-  - '@typescript-eslint/parser@8.71.1'
-  - '@typescript-eslint/project-service@8.71.1'
-  - '@typescript-eslint/scope-manager@8.71.1'
-  - '@typescript-eslint/tsconfig-utils@8.71.1'
-  - '@typescript-eslint/type-utils@8.71.1'
-  - '@typescript-eslint/types@8.71.1'
-  - '@typescript-eslint/typescript-estree@8.71.1'
-  - '@typescript-eslint/utils@8.71.1'
-  - '@typescript-eslint/visitor-keys@8.71.1'
-  - typescript-eslint@8.71.1
   - '@radix-ui/react-dialog@1.2.0'
   - '@radix-ui/react-dismissable-layer@1.1.20'
   - '@radix-ui/react-focus-scope@1.2.0'
@@ -21,4 +10,12 @@ minimumReleaseAgeExclude:
   - '@radix-ui/react-presence@1.1.11'
   - '@radix-ui/react-primitive@2.1.11'
   - '@radix-ui/react-slot@1.4.0'
-  - ondocs@0.10.0
+overrides:
+  # Moderate GHSA-g3hv-75wg-m249: a pattern with **/.. portions makes minimatch 7 to 11.0.0 build
+  # an amplified set of patterns and compare them in pairs, and only 11.0.1 fixes it. The lint's
+  # dependencies ask for ^10: ESLint 10 and its @eslint/config-array, and typescript-eslint's
+  # typescript-estree (only for allowDefaultProject, which neither ESLint config sets). They call
+  # minimatch(), new Minimatch(), its match() and its pattern, which 11 keeps (it removes makeRe(),
+  # the regexp property and the AST class), and `pnpm lint` reports the same with it. Take it out
+  # once ESLint and typescript-eslint ask for 11. ESLint 9's minimatch 3 is not affected.
+  'minimatch@>=7 <11.0.1': ^11.0.1
