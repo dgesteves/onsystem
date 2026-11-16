@@ -16,6 +16,7 @@ overrides:
   # dependencies ask for ^10: ESLint 10 and its @eslint/config-array, and typescript-eslint's
   # typescript-estree (only for allowDefaultProject, which neither ESLint config sets). They call
   # minimatch(), new Minimatch(), its match() and its pattern, which 11 keeps (it removes makeRe(),
-  # the regexp property and the AST class), and `pnpm lint` reports the same with it. Take it out
-  # once ESLint and typescript-eslint ask for 11. ESLint 9's minimatch 3 is not affected.
+  # the regexp property and the AST class), and `pnpm lint` reports the same with it. ESLint 10.15
+  # and config-array 0.23.6 ask for ^11.0.5: take it out once the lockfile has them and
+  # typescript-eslint asks for 11 too. ESLint 9's minimatch 3 is not affected.
   'minimatch@>=7 <11.0.1': ^11.0.1
