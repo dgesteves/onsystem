@@ -16,6 +16,12 @@ updates:
       # newer types would let code use APIs that Node 24 doesn't have. Move it with .nvmrc and CI.
       - dependency-name: '@types/node'
         update-types: ['version-update:semver-major']
+      # examples/tailwind-v3 is the Tailwind 3 setup (HSL channel tokens and a tailwind.config.ts),
+      # so it stays on Tailwind 3: on 4, its config no longer typechecks. Dependabot can't hold back
+      # one workspace package alone, so this holds the other packages' next Tailwind major too.
+      # Move those by hand.
+      - dependency-name: tailwindcss
+        update-types: ['version-update:semver-major']
   - package-ecosystem: github-actions
     directory: /
     schedule:
