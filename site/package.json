@@ -20,7 +20,7 @@
     "cmdk": "^1.1.1",
     "geist": "^1.7.2",
     "next": "^16.4.2",
-    "ondocs": "^0.10.0",
+    "ondocs": "^0.18.0",
     "onsystem": "workspace:*",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
