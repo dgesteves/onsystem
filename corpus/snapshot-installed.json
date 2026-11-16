@@ -1,6 +1,6 @@
 {
   "$comment": "Written by `node scripts/corpus.mjs --installed --update`. Counts per run and rule with the dependencies installed from each repository's lockfile, as bench/v2 installs them; `labels` records which labelled findings were reported.",
-  "version": "0.7.0",
+  "version": "0.12.1",
   "runs": {
     "saas-starter-installed": {
       "inspect": {
@@ -9,7 +9,7 @@
         "components": 7,
         "parts": 23,
         "tokens": {
-          "color": 40,
+          "color": 32,
           "radius": 8,
           "spacing": 1
         },
@@ -336,12 +336,13 @@
         "components": 430,
         "parts": 17,
         "tokens": {
-          "color": 24
+          "color": 24,
+          "radius": 7
         },
         "warnings": 1
       },
       "files": 1484,
-      "flagged": 1009,
+      "flagged": 1011,
       "rules": {
         "icon-button-accessible-name": {
           "errors": 52,
@@ -352,6 +353,11 @@
           "errors": 10910,
           "warnings": 245,
           "fixes": 6726
+        },
+        "no-hardcoded-radius": {
+          "errors": 0,
+          "warnings": 47,
+          "fixes": 47
         },
         "no-unknown-prop": {
           "errors": 4,
@@ -372,7 +378,8 @@
         "components": 430,
         "parts": 17,
         "tokens": {
-          "color": 24
+          "color": 24,
+          "radius": 7
         },
         "warnings": 1
       },
@@ -389,6 +396,11 @@
           "warnings": 11,
           "fixes": 137
         },
+        "no-hardcoded-radius": {
+          "errors": 0,
+          "warnings": 5,
+          "fixes": 5
+        },
         "prefer-design-system-component": {
           "errors": 15,
           "warnings": 0,
@@ -403,12 +415,13 @@
         "components": 108,
         "parts": 17,
         "tokens": {
-          "color": 24
+          "color": 24,
+          "radius": 7
         },
         "warnings": 0
       },
       "files": 1422,
-      "flagged": 989,
+      "flagged": 991,
       "rules": {
         "icon-button-accessible-name": {
           "errors": 56,
@@ -419,6 +432,11 @@
           "errors": 10853,
           "warnings": 215,
           "fixes": 6726
+        },
+        "no-hardcoded-radius": {
+          "errors": 0,
+          "warnings": 47,
+          "fixes": 47
         },
         "no-unknown-prop": {
           "errors": 4,
@@ -442,7 +460,8 @@
             "components": 430,
             "parts": 17,
             "tokens": {
-              "color": 24
+              "color": 24,
+              "radius": 7
             },
             "warnings": 1
           },
@@ -460,7 +479,8 @@
             "components": 430,
             "parts": 17,
             "tokens": {
-              "color": 24
+              "color": 24,
+              "radius": 7
             },
             "warnings": 1
           }
@@ -468,7 +488,7 @@
         "others": 8
       },
       "files": 1521,
-      "flagged": 1029,
+      "flagged": 1031,
       "rules": {
         "icon-button-accessible-name": {
           "errors": 54,
@@ -479,6 +499,11 @@
           "errors": 11207,
           "warnings": 256,
           "fixes": 6863
+        },
+        "no-hardcoded-radius": {
+          "errors": 0,
+          "warnings": 52,
+          "fixes": 52
         },
         "no-unknown-prop": {
           "errors": 4,
